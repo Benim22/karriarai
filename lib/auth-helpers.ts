@@ -58,6 +58,11 @@ export async function checkSession() {
 export function handleAuthError(error: any): string {
   if (!error) return 'Okänt fel'
   
+  // Check if it's a database error during user creation
+  if (error.message && error.message.includes('Database error saving new user')) {
+    return 'Registreringen lyckades men det uppstod ett problem med att skapa din profil. Kontakta support om problemet kvarstår.'
+  }
+  
   // Common auth errors
   const errorMessages: { [key: string]: string } = {
     'AuthSessionMissingError': 'Session saknas. Vänligen logga in igen.',
@@ -67,9 +72,22 @@ export function handleAuthError(error: any): string {
     'email_not_confirmed': 'Email inte bekräftad. Kontrollera din email.',
     'too_many_requests': 'För många försök. Vänta en stund och försök igen.',
     'signup_disabled': 'Registrering är inte tillgänglig för tillfället.',
+    'weak_password': 'Lösenordet är för svagt. Använd minst 6 tecken.',
+    'email_already_in_use': 'Email-adressen används redan av ett annat konto.',
+    'invalid_email': 'Ogiltig email-adress.',
   }
 
   const errorCode = error.message || error.code || error.name
+  
+  // Check for specific error patterns
+  if (errorCode.includes('duplicate key') || errorCode.includes('already exists')) {
+    return 'Ett konto med denna email-adress finns redan.'
+  }
+  
+  if (errorCode.includes('Database error') || errorCode.includes('database')) {
+    return 'Databasfel uppstod. Försök igen eller kontakta support.'
+  }
+  
   return errorMessages[errorCode] || `Autentiseringsfel: ${errorCode}`
 }
 
@@ -98,5 +116,52 @@ export async function signOutSafely() {
     }
     console.error('Failed to sign out:', error)
     return { success: false, error: 'Kunde inte logga ut' }
+  }
+}
+
+// Helper function to create user profile manually if trigger fails
+export async function createUserProfileManually(userId: string, email: string, fullName: string) {
+  try {
+    // Create profile
+    const { error: profileError } = await supabase
+      .from('karriar_profiles')
+      .insert({
+        id: userId,
+        email: email,
+        full_name: fullName,
+        subscription_tier: 'free',
+        subscription_status: 'free',
+        extra_cv_credits: 0,
+        export_credits: 0,
+        lifetime_access: false
+      })
+
+    if (profileError) {
+      console.error('Error creating profile manually:', profileError)
+      return false
+    }
+
+    // Create payment record
+    const { error: paymentError } = await supabase
+      .from('payments')
+      .insert({
+        user_id: userId,
+        amount: 0,
+        currency: 'SEK',
+        status: 'succeeded',
+        subscription_tier: 'free',
+        plan_type: 'free',
+        billing_interval: 'none'
+      })
+
+    if (paymentError) {
+      console.error('Error creating payment record manually:', paymentError)
+      // Don't fail if payment record creation fails
+    }
+
+    return true
+  } catch (error) {
+    console.error('Error in createUserProfileManually:', error)
+    return false
   }
 } 

@@ -745,6 +745,7 @@ function CVBuilderContent() {
   const improveTextWithAI = async (text: string, type: 'summary' | 'experience' | 'education', context?: any) => {
     setAiImproving(type)
     try {
+      console.log('🔍 Frontend: Calling AI improvement API...')
       const response = await fetch('/api/ai/improve-text', {
         method: 'POST',
         headers: {
@@ -757,15 +758,40 @@ function CVBuilderContent() {
         }),
       })
 
+      console.log('📡 Frontend: API response status:', response.status)
+
       if (!response.ok) {
-        throw new Error('AI improvement failed')
+        const errorData = await response.json().catch(() => ({}))
+        console.error('❌ Frontend: API error:', errorData)
+        throw new Error(errorData.error || `HTTP ${response.status}`)
       }
 
       const data = await response.json()
+      console.log('✅ Frontend: AI improvement successful')
+      
+      // Show a success notification
+      const event = new CustomEvent('show-toast', {
+        detail: { 
+          message: 'Text förbättrad med AI!', 
+          type: 'success' 
+        }
+      })
+      window.dispatchEvent(event)
+      
       return data.improvedText || text
     } catch (error) {
-      console.error('AI improvement failed:', error)
-      // Fallback to original text if AI fails
+      console.error('❌ Frontend: AI improvement failed:', error)
+      
+      // Show error notification
+      const event = new CustomEvent('show-toast', {
+        detail: { 
+          message: `AI-förbättring misslyckades: ${error instanceof Error ? error.message : 'Okänt fel'}`, 
+          type: 'error' 
+        }
+      })
+      window.dispatchEvent(event)
+      
+      // Return original text if AI fails
       return text
     } finally {
       setAiImproving(null)

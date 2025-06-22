@@ -1,131 +1,151 @@
 import Stripe from "stripe"
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-06-20",
-})
+// Check if Stripe keys are available
+const hasStripeKeys = process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.startsWith('sk_')
 
-export const PRICING_PLANS = {
-  free: {
-    name: "Gratis",
-    price: 0,
-    features: ["1 CV", "Grundläggande mallar", "Förhandsvisning", "Ingen export"],
-    limits: {
-      cvs: 1,
-      exports: 0,
-      templates: ["traditional"],
-    },
-  },
-  oneTimeCV: {
-    name: "Extra CV",
-    price: 1900, // 19 SEK in öre
-    currency: "SEK",
-    features: ["1 extra CV", "Alla mallar", "Obegränsade exporter"],
-    description: "Köp ett extra CV för engångsbruk"
-  },
-  pro: {
-    name: "Pro",
-    price: 9900, // 99 SEK per month
-    currency: "SEK",
-    interval: "month",
-    features: [
-      "Obegränsat antal CV",
-      "15+ professionella mallar", 
-      "AI-optimering av innehåll",
-      "Avancerad jobbmatchning",
-      "Personlig karriärrådgivning",
-      "Prioritetssupport",
-      "Exportera till Word & PDF"
-    ],
-    limits: {
-      cvs: -1, // unlimited
-      exports: -1,
-      templates: ["traditional", "modern", "creative"],
-      priority_support: true,
-      career_guidance: true,
-      ai_optimization: true
-    },
-  },
-  enterprise: {
-    name: "Enterprise",
-    price: 29900, // 299 SEK per month
-    currency: "SEK",
-    interval: "month",
-    features: [
-      "Allt i Pro",
-      "Teamhantering",
-      "Bulk CV-analys", 
-      "Anpassade mallar",
-      "API-åtkomst",
-      "Dedikerad kontoansvarig",
-      "SLA-garanti",
-      "Anpassad integration"
-    ],
-    limits: {
-      cvs: -1,
-      exports: -1,
-      templates: ["traditional", "modern", "creative", "custom"],
-      team_management: true,
-      bulk_analysis: true,
-      api_access: true,
-      custom_templates: true,
-      dedicated_support: true,
-      sla_guarantee: true,
-      custom_integration: true
-    },
-  },
+if (!hasStripeKeys && process.env.NODE_ENV === 'production') {
+  throw new Error('STRIPE_SECRET_KEY is not set in environment variables')
 }
 
-// Stripe Product IDs (dessa skulle sättas upp i Stripe Dashboard)
-export const STRIPE_PRODUCTS = {
-  oneTimeCV: process.env.STRIPE_ONE_TIME_CV_PRICE_ID || "price_one_time_cv",
-  pro: process.env.STRIPE_PRO_PRICE_ID || "price_pro_monthly", 
-  enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID || "price_enterprise_monthly"
+// Initialize Stripe only if keys are available
+export const stripe = hasStripeKeys 
+  ? new Stripe(process.env.STRIPE_SECRET_KEY!, {
+      apiVersion: "2024-12-18.acacia",
+    })
+  : null
+
+if (!hasStripeKeys) {
+  console.warn('⚠️  Stripe not initialized: STRIPE_SECRET_KEY not found or invalid. Payment features will be disabled.')
 }
 
-// Helper function för att få plan baserat på subscription tier
-export function getPlanByTier(tier: string) {
-  switch (tier) {
-    case 'free':
-      return PRICING_PLANS.free
-    case 'pro':
-      return PRICING_PLANS.pro
-    case 'enterprise':
-      return PRICING_PLANS.enterprise
-    default:
-      return PRICING_PLANS.free
-  }
-}
-
-// Helper function för att kontrollera funktioner baserat på prenumeration
-export function hasFeature(tier: string, feature: string): boolean {
-  const plan = getPlanByTier(tier)
+// Stripe Price IDs - Replace these with your actual Price IDs from Stripe Dashboard
+export const STRIPE_PRICES = {
+  // Monthly subscriptions
+  PRO_MONTHLY: process.env.STRIPE_PRO_MONTHLY_PRICE_ID || "price_pro_monthly",
+  ENTERPRISE_MONTHLY: process.env.STRIPE_ENTERPRISE_MONTHLY_PRICE_ID || "price_enterprise_monthly",
   
-  switch (feature) {
-    case 'unlimited_cvs':
-      return plan.limits?.cvs === -1
-    case 'unlimited_exports':
-      return plan.limits?.exports === -1
-    case 'priority_support':
-      return plan.limits?.priority_support === true
-    case 'career_guidance':
-      return plan.limits?.career_guidance === true
-    case 'ai_optimization':
-      return plan.limits?.ai_optimization === true
-    case 'team_management':
-      return plan.limits?.team_management === true
-    case 'bulk_analysis':
-      return plan.limits?.bulk_analysis === true
-    case 'api_access':
-      return plan.limits?.api_access === true
-    case 'custom_templates':
-      return plan.limits?.custom_templates === true
-    case 'dedicated_support':
-      return plan.limits?.dedicated_support === true
-    case 'sla_guarantee':
-      return plan.limits?.sla_guarantee === true
-    case 'custom_integration':
-      return plan.limits?.custom_integration === true
-    default:
-      return false
+  // Lifetime subscriptions
+  PRO_LIFETIME: process.env.STRIPE_PRO_LIFETIME_PRICE_ID || "price_pro_lifetime",
+  ENTERPRISE_LIFETIME: process.env.STRIPE_ENTERPRISE_LIFETIME_PRICE_ID || "price_enterprise_lifetime",
+  
+  // One-time purchases
+  EXTRA_CV_CREDIT: process.env.STRIPE_EXTRA_CV_PRICE_ID || "price_extra_cv",
+  SINGLE_EXPORT: process.env.STRIPE_SINGLE_EXPORT_PRICE_ID || "price_single_export",
+}
+
+// Product configuration
+export const PRICING_PLANS = {
+  pro_monthly: {
+    name: "Pro Monthly",
+    price: 99,
+    currency: "SEK",
+    interval: "month",
+    priceId: STRIPE_PRICES.PRO_MONTHLY,
+    features: [
+      "Unlimited CVs",
+      "Priority support (4-8h response)",
+      "Personal career guidance",
+      "Premium CV templates",
+      "Advanced AI features"
+    ]
+  },
+  pro_lifetime: {
+    name: "Pro Lifetime",
+    price: 1990,
+    currency: "SEK",
+    interval: "lifetime",
+    priceId: STRIPE_PRICES.PRO_LIFETIME,
+    features: [
+      "All Pro features",
+      "Lifetime access",
+      "No recurring payments",
+      "Future feature updates included"
+    ]
+  },
+  enterprise_monthly: {
+    name: "Enterprise Monthly",
+    price: 299,
+    currency: "SEK",
+    interval: "month",
+    priceId: STRIPE_PRICES.ENTERPRISE_MONTHLY,
+    features: [
+      "Everything in Pro",
+      "Team management",
+      "Bulk CV export",
+      "API access",
+      "Custom templates",
+      "Priority support (1-2h response)",
+      "Dedicated account manager"
+    ]
+  },
+  enterprise_lifetime: {
+    name: "Enterprise Lifetime",
+    price: 4990,
+    currency: "SEK",
+    interval: "lifetime",
+    priceId: STRIPE_PRICES.ENTERPRISE_LIFETIME,
+    features: [
+      "All Enterprise features",
+      "Lifetime access",
+      "No recurring payments",
+      "Future feature updates included"
+    ]
+  },
+  extra_cv: {
+    name: "Extra CV Credit",
+    price: 19,
+    currency: "SEK",
+    interval: "one_time",
+    priceId: STRIPE_PRICES.EXTRA_CV_CREDIT,
+    features: [
+      "Create 1 additional CV",
+      "No recurring charges",
+      "Instant access"
+    ]
+  },
+  single_export: {
+    name: "Single Export",
+    price: 9,
+    currency: "SEK",
+    interval: "one_time",
+    priceId: STRIPE_PRICES.SINGLE_EXPORT,
+    features: [
+      "Export 1 CV to PDF/DOCX",
+      "High-quality format",
+      "Instant download"
+    ]
   }
+}
+
+export type PlanType = keyof typeof PRICING_PLANS
+
+// Helper function to get plan details
+export function getPlanDetails(planType: PlanType) {
+  return PRICING_PLANS[planType]
+}
+
+// Helper function to determine subscription tier from plan
+export function getSubscriptionTierFromPlan(planType: PlanType): string {
+  if (planType.includes('pro')) return 'pro'
+  if (planType.includes('enterprise')) return 'enterprise'
+  return 'free'
+}
+
+// Helper function to check if plan is lifetime
+export function isLifetimePlan(planType: PlanType): boolean {
+  return planType.includes('lifetime')
+}
+
+// Helper function to get all subscription plans (excluding one-time purchases)
+export function getSubscriptionPlans() {
+  return Object.entries(PRICING_PLANS).filter(([key]) => 
+    !key.includes('extra_cv') && !key.includes('single_export')
+  )
+}
+
+// Helper function to get one-time purchase options
+export function getOneTimePurchases() {
+  return Object.entries(PRICING_PLANS).filter(([key]) => 
+    key.includes('extra_cv') || key.includes('single_export')
+  )
 }

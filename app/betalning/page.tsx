@@ -1,37 +1,95 @@
 "use client"
 
+import { useState, useEffect } from 'react'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Check, Zap, Crown, Building, Star, ArrowRight } from "lucide-react"
+import { Check, Zap, Crown, Building, Star, ArrowRight, CreditCard, AlertCircle } from "lucide-react"
 import Link from "next/link"
+import { useRouter, useSearchParams } from 'next/navigation'
 import { PRICING_PLANS, getSubscriptionPlans, getOneTimePurchases } from "@/lib/stripe"
+import { 
+  PaymentButton, 
+  ProMonthlyButton, 
+  ProLifetimeButton, 
+  EnterpriseMonthlyButton,
+  EnterpriseLifetimeButton,
+  ExtraCVButton,
+  SingleExportButton,
+  PaymentUnavailableNotice 
+} from "@/components/payment-button"
+import { useToast } from '@/hooks/use-toast'
 
-export default function PricingPage() {
+export default function BetalningPage() {
+  const [userEmail, setUserEmail] = useState<string>('')
+  const [selectedPlan, setSelectedPlan] = useState<string>('')
+  const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { toast } = useToast()
+
+  // Get plan from URL params
+  useEffect(() => {
+    const plan = searchParams.get('plan')
+    const email = searchParams.get('email')
+    
+    if (plan) {
+      setSelectedPlan(plan)
+    }
+    if (email) {
+      setUserEmail(email)
+    }
+    setIsLoading(false)
+  }, [searchParams])
+
   const subscriptionPlans = getSubscriptionPlans()
   const oneTimePurchases = getOneTimePurchases()
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Laddar betalningsalternativ...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero Section */}
-      <section className="py-20 px-4">
+      {/* Header */}
+      <section className="py-12 px-4 border-b">
         <div className="container mx-auto text-center">
-          <h1 className="text-4xl md:text-6xl font-bold mb-6">
-            Välj din plan
+          <h1 className="text-3xl md:text-4xl font-bold mb-4">
+            Slutför ditt köp
           </h1>
-          <p className="text-xl text-muted-foreground mb-12 max-w-2xl mx-auto">
-            Från gratis start till Enterprise-lösningar. Hitta den perfekta planen för dina behov.
+          <p className="text-lg text-muted-foreground mb-6">
+            Välj den plan som passar dig bäst och kom igång direkt
           </p>
+          
+          {!userEmail && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 max-w-md mx-auto mb-6">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  Du behöver logga in för att slutföra köpet
+                </p>
+              </div>
+              <Button asChild className="mt-3 w-full" size="sm">
+                <Link href="/auth/login">Logga in</Link>
+              </Button>
+            </div>
+          )}
         </div>
       </section>
 
-      {/* Pricing Cards */}
+      {/* Payment Options */}
       <section className="py-12 px-4">
-        <div className="container mx-auto">
-          <Tabs defaultValue="monthly" className="w-full">
-            <TabsList className="grid w-full max-w-md mx-auto grid-cols-3 mb-12">
+        <div className="container mx-auto max-w-6xl">
+          <Tabs defaultValue={selectedPlan.includes('monthly') ? 'monthly' : selectedPlan.includes('lifetime') ? 'lifetime' : selectedPlan.includes('extra') || selectedPlan.includes('export') ? 'onetime' : 'monthly'} className="w-full">
+            <TabsList className="grid w-full max-w-md mx-auto grid-cols-3 mb-8">
               <TabsTrigger value="monthly">Månadsvis</TabsTrigger>
               <TabsTrigger value="lifetime">Livstid</TabsTrigger>
               <TabsTrigger value="onetime">Engångsköp</TabsTrigger>
@@ -39,45 +97,18 @@ export default function PricingPage() {
 
             {/* Monthly Plans */}
             <TabsContent value="monthly">
-              <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-                {/* Free Plan */}
-                <Card className="relative">
-                  <CardHeader>
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                        <Star className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-                      </div>
-                      <CardTitle>Gratis</CardTitle>
-                    </div>
-                    <div className="text-3xl font-bold">0 kr</div>
-                    <CardDescription>Perfekt för att komma igång</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      {['1 CV', 'Grundläggande mallar', 'Förhandsvisning'].map((feature) => (
-                        <div key={feature} className="flex items-center gap-2">
-                          <Check className="h-4 w-4 text-green-500" />
-                          <span className="text-sm">{feature}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <Button className="w-full" asChild>
-                      <Link href="/auth/register">Kom igång gratis</Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-
+              <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
                 {/* Pro Monthly */}
-                <Card className="relative border-primary shadow-lg">
-                  <Badge className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-primary">
-                    POPULÄR
-                  </Badge>
+                <Card className={`relative ${selectedPlan === 'pro_monthly' ? 'border-primary shadow-lg' : ''}`}>
                   <CardHeader>
                     <div className="flex items-center gap-2 mb-2">
                       <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
                         <Zap className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                       </div>
-                      <CardTitle>Pro</CardTitle>
+                      <CardTitle>Pro Monthly</CardTitle>
+                      {selectedPlan === 'pro_monthly' && (
+                        <Badge variant="secondary">Vald</Badge>
+                      )}
                     </div>
                     <div className="text-3xl font-bold">99 kr<span className="text-lg font-normal text-muted-foreground">/mån</span></div>
                     <CardDescription>För professionella användare</CardDescription>
@@ -91,23 +122,25 @@ export default function PricingPage() {
                         </div>
                       ))}
                     </div>
-                    <Button className="w-full" asChild>
-                      <Link href="/auth/register?plan=pro_monthly">
-                        Välj Pro
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </Link>
-                    </Button>
+                    <ProMonthlyButton 
+                      email={userEmail} 
+                      className="w-full"
+                      disabled={!userEmail}
+                    />
                   </CardContent>
                 </Card>
 
                 {/* Enterprise Monthly */}
-                <Card className="relative">
+                <Card className={`relative ${selectedPlan === 'enterprise_monthly' ? 'border-primary shadow-lg' : ''}`}>
                   <CardHeader>
                     <div className="flex items-center gap-2 mb-2">
                       <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
                         <Building className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                       </div>
-                      <CardTitle>Enterprise</CardTitle>
+                      <CardTitle>Enterprise Monthly</CardTitle>
+                      {selectedPlan === 'enterprise_monthly' && (
+                        <Badge variant="secondary">Vald</Badge>
+                      )}
                     </div>
                     <div className="text-3xl font-bold">299 kr<span className="text-lg font-normal text-muted-foreground">/mån</span></div>
                     <CardDescription>För team och organisationer</CardDescription>
@@ -121,12 +154,11 @@ export default function PricingPage() {
                         </div>
                       ))}
                     </div>
-                    <Button className="w-full" variant="outline" asChild>
-                      <Link href="/kontakt?plan=enterprise">
-                        Kontakta oss
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </Link>
-                    </Button>
+                    <EnterpriseMonthlyButton 
+                      email={userEmail} 
+                      className="w-full"
+                      disabled={!userEmail}
+                    />
                   </CardContent>
                 </Card>
               </div>
@@ -134,9 +166,9 @@ export default function PricingPage() {
 
             {/* Lifetime Plans */}
             <TabsContent value="lifetime">
-              <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+              <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
                 {/* Pro Lifetime */}
-                <Card className="relative border-primary shadow-lg">
+                <Card className={`relative ${selectedPlan === 'pro_lifetime' ? 'border-primary shadow-lg' : ''}`}>
                   <Badge className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-blue-600 to-purple-600">
                     BÄST VÄRDE
                   </Badge>
@@ -146,6 +178,9 @@ export default function PricingPage() {
                         <Crown className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                       </div>
                       <CardTitle>Pro Livstid</CardTitle>
+                      {selectedPlan === 'pro_lifetime' && (
+                        <Badge variant="secondary">Vald</Badge>
+                      )}
                     </div>
                     <div className="text-3xl font-bold">1,990 kr<span className="text-lg font-normal text-muted-foreground"> engångsbetalning</span></div>
                     <CardDescription>Betala en gång, använd för alltid</CardDescription>
@@ -162,23 +197,25 @@ export default function PricingPage() {
                         </div>
                       ))}
                     </div>
-                    <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700" asChild>
-                      <Link href="/auth/register?plan=pro_lifetime">
-                        Köp Pro Livstid
-                        <Crown className="ml-2 h-4 w-4" />
-                      </Link>
-                    </Button>
+                    <ProLifetimeButton 
+                      email={userEmail} 
+                      className="w-full"
+                      disabled={!userEmail}
+                    />
                   </CardContent>
                 </Card>
 
                 {/* Enterprise Lifetime */}
-                <Card className="relative">
+                <Card className={`relative ${selectedPlan === 'enterprise_lifetime' ? 'border-primary shadow-lg' : ''}`}>
                   <CardHeader>
                     <div className="flex items-center gap-2 mb-2">
                       <div className="p-2 bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg">
                         <Building className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                       </div>
                       <CardTitle>Enterprise Livstid</CardTitle>
+                      {selectedPlan === 'enterprise_lifetime' && (
+                        <Badge variant="secondary">Vald</Badge>
+                      )}
                     </div>
                     <div className="text-3xl font-bold">4,990 kr<span className="text-lg font-normal text-muted-foreground"> engångsbetalning</span></div>
                     <CardDescription>Fullständig lösning för organisationer</CardDescription>
@@ -195,12 +232,11 @@ export default function PricingPage() {
                         </div>
                       ))}
                     </div>
-                    <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" asChild>
-                      <Link href="/kontakt?plan=enterprise_lifetime">
-                        Kontakta för Enterprise Livstid
-                        <Building className="ml-2 h-4 w-4" />
-                      </Link>
-                    </Button>
+                    <EnterpriseLifetimeButton 
+                      email={userEmail} 
+                      className="w-full"
+                      disabled={!userEmail}
+                    />
                   </CardContent>
                 </Card>
               </div>
@@ -208,15 +244,18 @@ export default function PricingPage() {
 
             {/* One-time Purchases */}
             <TabsContent value="onetime">
-              <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+              <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
                 {/* Extra CV Credit */}
-                <Card>
+                <Card className={`relative ${selectedPlan === 'extra_cv' ? 'border-primary shadow-lg' : ''}`}>
                   <CardHeader>
                     <div className="flex items-center gap-2 mb-2">
                       <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
-                        <Zap className="h-5 w-5 text-green-600 dark:text-green-400" />
+                        <CreditCard className="h-5 w-5 text-green-600 dark:text-green-400" />
                       </div>
                       <CardTitle>Extra CV</CardTitle>
+                      {selectedPlan === 'extra_cv' && (
+                        <Badge variant="secondary">Vald</Badge>
+                      )}
                     </div>
                     <div className="text-3xl font-bold">19 kr<span className="text-lg font-normal text-muted-foreground"> engångsbetalning</span></div>
                     <CardDescription>Skapa ett extra CV utöver din plan</CardDescription>
@@ -230,23 +269,25 @@ export default function PricingPage() {
                         </div>
                       ))}
                     </div>
-                    <Button className="w-full" variant="outline">
-                      Köp Extra CV
-                    </Button>
-                    <p className="text-xs text-muted-foreground text-center">
-                      Tillgängligt direkt i CV-byggaren när du når din gräns
-                    </p>
+                    <ExtraCVButton 
+                      email={userEmail} 
+                      className="w-full"
+                      disabled={!userEmail}
+                    />
                   </CardContent>
                 </Card>
 
                 {/* Single Export */}
-                <Card>
+                <Card className={`relative ${selectedPlan === 'single_export' ? 'border-primary shadow-lg' : ''}`}>
                   <CardHeader>
                     <div className="flex items-center gap-2 mb-2">
                       <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
                         <ArrowRight className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                       </div>
                       <CardTitle>Engångsexport</CardTitle>
+                      {selectedPlan === 'single_export' && (
+                        <Badge variant="secondary">Vald</Badge>
+                      )}
                     </div>
                     <div className="text-3xl font-bold">9 kr<span className="text-lg font-normal text-muted-foreground"> per export</span></div>
                     <CardDescription>Exportera ditt CV utan prenumeration</CardDescription>
@@ -260,12 +301,11 @@ export default function PricingPage() {
                         </div>
                       ))}
                     </div>
-                    <Button className="w-full" variant="outline">
-                      Köp Export
-                    </Button>
-                    <p className="text-xs text-muted-foreground text-center">
-                      Tillgängligt när du vill exportera ditt CV
-                    </p>
+                    <SingleExportButton 
+                      email={userEmail} 
+                      className="w-full"
+                      disabled={!userEmail}
+                    />
                   </CardContent>
                 </Card>
               </div>
@@ -274,33 +314,35 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* FAQ Section */}
-      <section className="py-20 px-4 bg-muted/50">
+      {/* Security & Support */}
+      <section className="py-12 px-4 bg-muted/50">
         <div className="container mx-auto max-w-4xl">
-          <h2 className="text-3xl font-bold text-center mb-12">Vanliga frågor</h2>
-          <div className="grid md:grid-cols-2 gap-8">
-            <div>
-              <h3 className="font-semibold mb-2">Vad ingår i livstidsplanen?</h3>
+          <div className="grid md:grid-cols-3 gap-6 text-center">
+            <div className="flex flex-col items-center">
+              <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-full mb-3">
+                <Check className="h-6 w-6 text-green-600 dark:text-green-400" />
+              </div>
+              <h3 className="font-semibold mb-2">Säker betalning</h3>
               <p className="text-sm text-muted-foreground">
-                Du får alla funktioner i din valda plan för alltid, inklusive framtida uppdateringar. Ingen återkommande betalning.
+                Alla betalningar hanteras säkert av Stripe med 256-bit SSL-kryptering
               </p>
             </div>
-            <div>
-              <h3 className="font-semibold mb-2">Kan jag uppgradera senare?</h3>
+            <div className="flex flex-col items-center">
+              <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-full mb-3">
+                <ArrowRight className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h3 className="font-semibold mb-2">Omedelbar åtkomst</h3>
               <p className="text-sm text-muted-foreground">
-                Ja, du kan uppgradera när som helst. Vi räknar av vad du redan betalat mot den nya planen.
+                Få tillgång till alla funktioner direkt efter slutförd betalning
               </p>
             </div>
-            <div>
-              <h3 className="font-semibold mb-2">Vad händer om jag avbryter?</h3>
+            <div className="flex flex-col items-center">
+              <div className="p-3 bg-purple-100 dark:bg-purple-900/20 rounded-full mb-3">
+                <Star className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              </div>
+              <h3 className="font-semibold mb-2">30 dagars garanti</h3>
               <p className="text-sm text-muted-foreground">
-                Du behåller åtkomst till alla skapade CV:n. Livstidsplaner påverkas inte av avbrott.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-2">Finns det studentrabatt?</h3>
-              <p className="text-sm text-muted-foreground">
-                Kontakta oss för specialpriser för studenter och utbildningsorganisationer.
+                Inte nöjd? Få pengarna tillbaka inom 30 dagar, inga frågor ställs
               </p>
             </div>
           </div>

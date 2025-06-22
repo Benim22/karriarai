@@ -1,7 +1,25 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
 // Initialize the Gemini AI client
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY || '')
+const apiKey = process.env.GOOGLE_GEMINI_API_KEY || ''
+const genAI = new GoogleGenerativeAI(apiKey)
+
+// Simple rate limiting to avoid quota issues
+let lastApiCall = 0
+const MIN_DELAY_BETWEEN_CALLS = 2000 // 2 seconds between calls
+
+async function waitForRateLimit() {
+  const now = Date.now()
+  const timeSinceLastCall = now - lastApiCall
+  
+  if (timeSinceLastCall < MIN_DELAY_BETWEEN_CALLS) {
+    const waitTime = MIN_DELAY_BETWEEN_CALLS - timeSinceLastCall
+    console.log(`⏱️ Rate limiting: waiting ${waitTime}ms...`)
+    await new Promise(resolve => setTimeout(resolve, waitTime))
+  }
+  
+  lastApiCall = Date.now()
+}
 
 export interface AIImprovementContext {
   title?: string
@@ -16,13 +34,28 @@ export async function improveTextWithAI(
   type: 'summary' | 'experience' | 'education' | 'bio' | 'job_title' | 'message' | 'search_query',
   context?: AIImprovementContext
 ): Promise<string> {
-  if (!process.env.GOOGLE_GEMINI_API_KEY) {
-    console.warn('Google Gemini API key is not configured')
-    return text
+  // Enhanced debugging
+  console.log('🔍 AI Service Debug:')
+  console.log('- API Key exists:', !!apiKey)
+  console.log('- API Key length:', apiKey.length)
+  console.log('- Text to improve:', text.substring(0, 50) + '...')
+  console.log('- Type:', type)
+
+  if (!apiKey || apiKey.length < 10) {
+    console.warn('❌ Google Gemini API key is not configured properly')
+    console.warn('Expected format: AIzaSy... (39 characters)')
+    console.warn('Current key:', apiKey ? `${apiKey.substring(0, 10)}...` : 'undefined')
+    
+    // Return original text with a note that AI is not available
+    return text + ' [AI förbättring ej tillgänglig - API-nyckel saknas]'
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
+    // Wait for rate limiting
+    await waitForRateLimit()
+    
+    console.log('🚀 Attempting to call Google Gemini API...')
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
 
     let systemPrompt = ''
     
@@ -40,7 +73,6 @@ Din uppgift är att förbättra den givna texten så att den:
 - Fokuserar på resultat och prestationer
 
 Förbättra följande professionella sammanfattning:`
-
         break
 
       case 'experience':
@@ -59,7 +91,6 @@ ${context?.title ? `Jobbtitel: ${context.title}` : ''}
 ${context?.company ? `Företag: ${context.company}` : ''}
 
 Förbättra följande arbetserfarenhets-beskrivning:`
-
         break
 
       case 'education':
@@ -76,7 +107,6 @@ ${context?.degree ? `Examen: ${context.degree}` : ''}
 ${context?.school ? `Skola: ${context.school}` : ''}
 
 Förbättra följande utbildnings-beskrivning:`
-
         break
 
       case 'bio':
@@ -91,7 +121,6 @@ Din uppgift är att förbättra den givna texten så att den:
 - Är mellan 2-4 meningar lång
 
 Förbättra följande professionella biografi:`
-
         break
 
       case 'job_title':
@@ -108,7 +137,6 @@ Din uppgift är att förbättra den givna jobbtiteln så att den:
 ${context?.jobTitle ? `Nuvarande titel: ${context.jobTitle}` : ''}
 
 Förbättra följande jobbtitel:`
-
         break
 
       case 'message':
@@ -123,7 +151,6 @@ Din uppgift är att förbättra det givna meddelandet så att det:
 - Är passande för affärskommunikation
 
 Förbättra följande meddelande:`
-
         break
 
       case 'search_query':
@@ -137,7 +164,6 @@ Din uppgift är att förbättra den givna sökfrågan så att den:
 - Använder svenska termer som rekryterare söker efter
 
 Förbättra följande sökfråga för jobbsökning:`
-
         break
     }
 
@@ -147,16 +173,47 @@ Förbättra följande sökfråga för jobbsökning:`
 
 Svara endast med den förbättrade texten, ingen extra förklaring eller kommentarer.`
 
+    console.log('📝 Sending prompt to Gemini...')
     const result = await model.generateContent(prompt)
+    console.log('📨 Received response from Gemini')
+    
     const response = await result.response
     const improvedText = response.text().trim()
+
+    console.log('✅ AI improvement successful')
+    console.log('- Original length:', text.length)
+    console.log('- Improved length:', improvedText.length)
 
     // Clean up any quotes that might be added by the AI
     return improvedText.replace(/^["']|["']$/g, '')
 
   } catch (error) {
-    console.error('AI improvement failed:', error)
-    // Return original text if AI fails
+    console.error('❌ AI improvement failed:', error)
+    console.error('Error details:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    })
+    
+    // Check if it's a quota error
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('Too Many Requests')) {
+      const quotaMessage = 'API-kvot överskriden. Vänta en minut och försök igen.'
+      
+      if (process.env.NODE_ENV === 'development') {
+        return text + ' [' + quotaMessage + ']'
+      }
+      
+      // In production, just return original text
+      return text
+    }
+    
+    // Return original text with error indicator in development
+    if (process.env.NODE_ENV === 'development') {
+      return text + ' [AI fel: ' + errorMessage.substring(0, 100) + ']'
+    }
+    
+    // Return original text in production
     return text
   }
 }
@@ -170,7 +227,10 @@ export async function generateCVSuggestions(
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
+    // Wait for rate limiting
+    await waitForRateLimit()
+    
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
 
     const prompt = `Du är en professionell CV-rådgivare. Analysera följande CV-data och ge 5 konkreta förbättringsförslag på svenska.
 

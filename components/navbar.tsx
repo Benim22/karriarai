@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { CVOverviewDialog } from "@/components/cv-overview-dialog"
+import { CVPaymentDialog } from "@/components/cv-payment-dialog"
 
 const publicNavItems = [
   { href: "/", label: "Hem" },
@@ -30,7 +32,7 @@ const publicNavItems = [
 
 const protectedNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: FileText },
-  { href: "/cv-builder", label: "CV-byggare", icon: FileText },
+  { href: "#", label: "CV-byggare", icon: FileText, isDialog: true },
   { href: "/exempel-cv", label: "CV-mallar", icon: FileText },
   { href: "/jobbmatchning", label: "Jobb", icon: FileText },
 ]
@@ -38,6 +40,8 @@ const protectedNavItems = [
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
   const [showError, setShowError] = useState(true)
+  const [showCVOverview, setShowCVOverview] = useState(false)
+  const [showCVPayment, setShowCVPayment] = useState(false)
   const pathname = usePathname()
   const { user, profile, error, signOut } = useAuth()
 
@@ -69,6 +73,32 @@ export function Navbar() {
     clearLocalSession()
     setShowError(false)
     window.location.href = '/auth/login' // Hard redirect to login
+  }
+
+  const handleCVBuilderClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setShowCVOverview(true)
+  }
+
+  const handleCreateNewCV = () => {
+    setShowCVOverview(false)
+    // Gå direkt till CV-byggaren för att skapa nytt CV
+    window.location.href = '/cv-builder'
+  }
+
+  const handleShowPayment = () => {
+    setShowCVOverview(false)
+    setShowCVPayment(true)
+  }
+
+  const handlePayOneTime = () => {
+    setShowCVPayment(false)
+    // Betalning hanteras i CVPaymentDialog komponenten
+  }
+
+  const handleUpgradeSubscription = () => {
+    setShowCVPayment(false)
+    // Redirect hanteras i CVPaymentDialog komponenten
   }
 
   return (
@@ -130,15 +160,27 @@ export function Navbar() {
               // Authenticated navigation
               <>
                 {protectedNavItems.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`text-sm font-medium transition-colors hover:text-primary cursor-pointer ${
-                      pathname === item.href ? "text-primary" : "text-muted-foreground"
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
+                  item.isDialog ? (
+                    <button
+                      key={item.href}
+                      onClick={handleCVBuilderClick}
+                      className={`text-sm font-medium transition-colors hover:text-primary cursor-pointer ${
+                        pathname === item.href ? "text-primary" : "text-muted-foreground"
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ) : (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`text-sm font-medium transition-colors hover:text-primary cursor-pointer ${
+                        pathname === item.href ? "text-primary" : "text-muted-foreground"
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  )
                 ))}
               </>
             ) : (
@@ -226,16 +268,31 @@ export function Navbar() {
                   {user ? (
                     <>
                       {protectedNavItems.map((item) => (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className={`text-sm font-medium transition-colors hover:text-primary cursor-pointer ${
-                            pathname === item.href ? "text-primary" : "text-muted-foreground"
-                          }`}
-                          onClick={() => setIsOpen(false)}
-                        >
-                          {item.label}
-                        </Link>
+                        item.isDialog ? (
+                          <button
+                            key={item.href}
+                            onClick={() => {
+                              handleCVBuilderClick(new MouseEvent('click') as any)
+                              setIsOpen(false)
+                            }}
+                            className={`text-sm font-medium transition-colors hover:text-primary cursor-pointer text-left ${
+                              pathname === item.href ? "text-primary" : "text-muted-foreground"
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ) : (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className={`text-sm font-medium transition-colors hover:text-primary cursor-pointer ${
+                              pathname === item.href ? "text-primary" : "text-muted-foreground"
+                            }`}
+                            onClick={() => setIsOpen(false)}
+                          >
+                            {item.label}
+                          </Link>
+                        )
                       ))}
                       <div className="border-t pt-4">
                         <Link
@@ -298,6 +355,21 @@ export function Navbar() {
         </div>
       </div>
     </nav>
+
+    {/* CV Dialogs */}
+    <CVOverviewDialog
+      open={showCVOverview}
+      onOpenChange={setShowCVOverview}
+      onCreateNew={handleCreateNewCV}
+      onShowPayment={handleShowPayment}
+    />
+    
+    <CVPaymentDialog
+      open={showCVPayment}
+      onOpenChange={setShowCVPayment}
+      onPayOneTime={handlePayOneTime}
+      onUpgradeSubscription={handleUpgradeSubscription}
+    />
     </>
   )
 }

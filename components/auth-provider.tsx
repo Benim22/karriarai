@@ -4,7 +4,7 @@ import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import type { User } from "@supabase/supabase-js"
 import type { UserProfile } from "@/types/user"
-import { handleAuthError, signOutSafely, checkSession, clearLocalSession } from "@/lib/auth-helpers"
+import { handleAuthError, signOutSafely, checkSession, clearLocalSession, createUserProfileManually } from "@/lib/auth-helpers"
 
 // Import supabase with error handling
 let supabase: any = null
@@ -275,6 +275,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         throw new Error(handleAuthError(error))
       }
+      
+      // If user was created successfully but trigger might have failed,
+      // try to create profile manually after a short delay
+      if (data.user && !error) {
+        setTimeout(async () => {
+          try {
+            // Check if profile exists
+            const { data: existingProfile } = await supabase
+              .from('karriar_profiles')
+              .select('id')
+              .eq('id', data.user!.id)
+              .single()
+            
+            if (!existingProfile) {
+              console.log('Profile not found, creating manually...')
+              await createUserProfileManually(data.user!.id, email, fullName)
+            }
+          } catch (profileError) {
+            console.error('Error checking/creating profile:', profileError)
+          }
+        }, 1000) // Wait 1 second for trigger to complete
+      }
+      
       return data
     } catch (error) {
       console.error("Sign up error:", error)

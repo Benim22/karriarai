@@ -149,12 +149,29 @@ CREATE POLICY "Templates are viewable by all" ON cv_templates FOR SELECT TO auth
 CREATE OR REPLACE FUNCTION public.handle_new_karriar_user()
 RETURNS TRIGGER AS $$
 BEGIN
+    -- Create profile
     INSERT INTO public.karriar_profiles (id, email, full_name)
     VALUES (
         NEW.id,
         NEW.email,
         COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email)
     );
+    
+    -- Create initial payment record to track subscription status
+    INSERT INTO public.payments (
+        user_id,
+        amount,
+        currency,
+        status,
+        subscription_tier
+    ) VALUES (
+        NEW.id,
+        0, -- Initial free tier has no cost
+        'SEK',
+        'succeeded', -- Free tier is automatically "succeeded"
+        'free' -- Start with free tier
+    );
+    
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
