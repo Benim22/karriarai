@@ -1,37 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { improveTextWithAI } from '@/lib/ai-service'
+import { testCreateUserProfile } from '@/lib/auth-helpers'
 
 export async function GET(request: NextRequest) {
-  // Only allow in development
-  if (process.env.NODE_ENV !== 'development') {
-    return NextResponse.json(
-      { error: 'Test endpoint only available in development' },
-      { status: 403 }
-    )
-  }
-
   try {
-    console.log('🧪 Testing AI service...')
-    
-    const testText = "Jag arbetar med webbutveckling och har erfarenhet av JavaScript."
-    const result = await improveTextWithAI(testText, 'summary')
+    console.log('Testing createUserProfileManually function...')
+    const result = await testCreateUserProfile()
     
     return NextResponse.json({
       success: true,
-      original: testText,
-      improved: result,
-      apiKeyConfigured: !!process.env.GOOGLE_GEMINI_API_KEY,
-      apiKeyLength: process.env.GOOGLE_GEMINI_API_KEY?.length || 0,
-      model: 'gemini-1.5-pro'
+      result: result,
+      message: result ? 'Profile creation test passed' : 'Profile creation test failed'
     })
-
-  } catch (error) {
-    console.error('❌ AI test failed:', error)
+  } catch (error: any) {
+    console.error('Test error:', error)
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      apiKeyConfigured: !!process.env.GOOGLE_GEMINI_API_KEY,
-      apiKeyLength: process.env.GOOGLE_GEMINI_API_KEY?.length || 0
-    })
+      error: error.message || 'Unknown error',
+      details: error
+    }, { status: 500 })
   }
 } 

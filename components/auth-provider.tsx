@@ -290,12 +290,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             
             if (!existingProfile) {
               console.log('Profile not found, creating manually...')
-              await createUserProfileManually(data.user!.id, email, fullName)
+              const success = await createUserProfileManually(data.user!.id, email, fullName)
+              if (success) {
+                console.log('Profile created successfully via manual process')
+              } else {
+                console.error('Failed to create profile manually')
+              }
+            } else {
+              console.log('Profile already exists, no need to create manually')
             }
           } catch (profileError) {
             console.error('Error checking/creating profile:', profileError)
           }
-        }, 1000) // Wait 1 second for trigger to complete
+        }, 2000) // Wait 2 seconds for trigger to complete, then createUserProfileManually has its own retry logic
       }
       
       return data

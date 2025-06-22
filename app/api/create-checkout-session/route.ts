@@ -39,10 +39,20 @@ export async function POST(req: NextRequest) {
     let lineItems: any[] = []
 
     if (planType.includes('monthly')) {
-      // Monthly subscription
+      // Monthly subscription - use price_data instead of priceId
       sessionMode = 'subscription'
       lineItems = [{
-        price: planDetails.priceId,
+        price_data: {
+          currency: planDetails.currency.toLowerCase(),
+          product_data: {
+            name: planDetails.name,
+            description: planDetails.features.join(', '),
+          },
+          unit_amount: planDetails.price * 100, // Convert to öre/cents
+          recurring: {
+            interval: 'month',
+          },
+        },
         quantity: 1,
       }]
     } else {

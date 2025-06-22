@@ -72,7 +72,7 @@ export function CVOverviewDialog({ open, onOpenChange, onCreateNew, onShowPaymen
           .select('*')
           .eq('id', user.id)
           .single(),
-        getUserSubscriptionTier(user.id)
+        getUserSubscriptionInfo(user.id)
       ])
 
       if (cvsResult.error) throw cvsResult.error
@@ -81,7 +81,7 @@ export function CVOverviewDialog({ open, onOpenChange, onCreateNew, onShowPaymen
       setCVs(cvsResult.data || [])
       setUserData({
         profile: profileResult.data,
-        subscriptionTier: subscriptionTier
+        subscriptionTier: subscriptionTier?.subscription_tier || 'free'
       })
     } catch (error) {
       console.error('Error loading data:', error)

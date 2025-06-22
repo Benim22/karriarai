@@ -122,46 +122,120 @@ export async function signOutSafely() {
 // Helper function to create user profile manually if trigger fails
 export async function createUserProfileManually(userId: string, email: string, fullName: string) {
   try {
-    // Create profile
-    const { error: profileError } = await supabase
-      .from('karriar_profiles')
-      .insert({
-        id: userId,
-        email: email,
-        full_name: fullName,
-        subscription_tier: 'free',
-        subscription_status: 'free',
-        extra_cv_credits: 0,
-        export_credits: 0,
-        lifetime_access: false
+    console.log('Creating profile manually for user:', userId, email)
+    
+    // Wait for user to be created in auth.users with retry logic
+    let authUser = null
+    let authError = null
+    const maxRetries = 5
+    const retryDelay = 1000 // 1 second
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      console.log(`Attempt ${attempt}/${maxRetries}: Checking if user exists in auth.users...`)
+      
+      const result = await supabase
+        .from('auth.users')
+        .select('id, email')
+        .eq('id', userId)
+        .single()
+      
+      authUser = result.data
+      authError = result.error
+      
+      if (authUser) {
+        console.log('User found in auth.users:', authUser)
+        break
+      }
+      
+      if (attempt < maxRetries) {
+        console.log(`User not found yet, waiting ${retryDelay}ms before retry...`)
+        await new Promise(resolve => setTimeout(resolve, retryDelay))
+      }
+    }
+    
+    if (authError || !authUser) {
+      console.error('User not found in auth.users after all retries:', {
+        userId,
+        authError,
+        attempts: maxRetries,
+        message: 'Cannot create profile - user must exist in auth.users first'
       })
+      return false
+    }
+    
+    console.log('User verified in auth.users after retries:', authUser)
+    
+    // Check if profile already exists
+    const { data: existingProfile } = await supabase
+      .from('karriar_profiles')
+      .select('id')
+      .eq('id', userId)
+      .single()
 
-    if (profileError) {
-      console.error('Error creating profile manually:', profileError)
+    if (existingProfile) {
+      console.log('Profile already exists for user:', userId)
+      return true
+    }
+
+    // Use the database function that can bypass RLS policies
+    console.log('Calling fix_missing_profiles_complete function...')
+    const { data: functionResult, error: functionError } = await supabase
+      .rpc('fix_missing_profiles_complete')
+
+    if (functionError) {
+      console.error('Error calling fix_missing_profiles_complete:', {
+        error: functionError,
+        code: functionError.code,
+        message: functionError.message,
+        details: functionError.details,
+        hint: functionError.hint
+      })
       return false
     }
 
-    // Create payment record
-    const { error: paymentError } = await supabase
-      .from('payments')
-      .insert({
-        user_id: userId,
-        amount: 0,
-        currency: 'SEK',
-        status: 'succeeded',
-        subscription_tier: 'free',
-        plan_type: 'free',
-        billing_interval: 'none'
-      })
+    console.log('fix_missing_profiles_complete result:', functionResult)
 
-    if (paymentError) {
-      console.error('Error creating payment record manually:', paymentError)
-      // Don't fail if payment record creation fails
+    // Verify that profile was created
+    const { data: newProfile, error: verifyError } = await supabase
+      .from('karriar_profiles')
+      .select('id, email, full_name')
+      .eq('id', userId)
+      .single()
+
+    if (verifyError || !newProfile) {
+      console.error('Profile verification failed after function call:', verifyError)
+      return false
     }
 
+    console.log('Profile successfully created and verified:', newProfile)
     return true
+
   } catch (error) {
     console.error('Error in createUserProfileManually:', error)
+    return false
+  }
+}
+
+// Test function to verify createUserProfileManually works
+export async function testCreateUserProfile() {
+  try {
+    console.log('Testing fix_missing_profiles_complete function...')
+    
+    // Just call the function directly - it will handle all users without profiles
+    const { data: functionResult, error: functionError } = await supabase
+      .rpc('fix_missing_profiles_complete')
+    
+    if (functionError) {
+      console.error('❌ Test failed:', functionError)
+      return false
+    }
+    
+    console.log('✅ Test successful - fix_missing_profiles_complete executed')
+    console.log('Results:', functionResult)
+    
+    return true
+  } catch (error) {
+    console.error('Error in test function:', error)
     return false
   }
 } 

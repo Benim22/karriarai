@@ -177,15 +177,15 @@ export function Navbar() {
                       {item.label}
                     </button>
                   ) : (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={`text-sm font-medium transition-colors hover:text-primary cursor-pointer ${
-                        pathname === item.href ? "text-primary" : "text-muted-foreground"
-                      }`}
-                    >
-                      {item.label}
-                    </Link>
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`text-sm font-medium transition-colors hover:text-primary cursor-pointer ${
+                      pathname === item.href ? "text-primary" : "text-muted-foreground"
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
                   )
                 ))}
               </>
@@ -288,16 +288,16 @@ export function Navbar() {
                             {item.label}
                           </button>
                         ) : (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            className={`text-sm font-medium transition-colors hover:text-primary cursor-pointer ${
-                              pathname === item.href ? "text-primary" : "text-muted-foreground"
-                            }`}
-                            onClick={() => setIsOpen(false)}
-                          >
-                            {item.label}
-                          </Link>
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={`text-sm font-medium transition-colors hover:text-primary cursor-pointer ${
+                            pathname === item.href ? "text-primary" : "text-muted-foreground"
+                          }`}
+                          onClick={() => setIsOpen(false)}
+                        >
+                          {item.label}
+                        </Link>
                         )
                       ))}
                       <div className="border-t pt-4">

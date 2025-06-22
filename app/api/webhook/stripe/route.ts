@@ -6,56 +6,71 @@ import { updateUserSubscriptionTier } from '@/lib/subscription-helpers'
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
 
 export async function POST(req: NextRequest) {
+  console.log('🔥 WEBHOOK RECEIVED - Starting processing')
+  
   try {
     // Check if Stripe is available
     if (!stripe) {
-      console.warn('Stripe webhook received but Stripe is not configured')
+      console.warn('❌ Stripe webhook received but Stripe is not configured')
       return NextResponse.json({ error: 'Stripe not configured' }, { status: 503 })
     }
 
     if (!webhookSecret) {
-      console.error('STRIPE_WEBHOOK_SECRET is not set')
+      console.error('❌ STRIPE_WEBHOOK_SECRET is not set')
       return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 })
     }
+
+    console.log('✅ Stripe and webhook secret are configured')
 
     const body = await req.text()
     const signature = req.headers.get('stripe-signature')!
 
+    console.log('📝 Request body length:', body.length)
+    console.log('🔐 Signature present:', !!signature)
+
     let event
     try {
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+      console.log('✅ Webhook signature verified successfully')
     } catch (err) {
-      console.error('Webhook signature verification failed:', err)
+      console.error('❌ Webhook signature verification failed:', err)
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
     }
 
-    console.log('Webhook event received:', event.type)
+    console.log('🎯 Webhook event received:', event.type)
+    console.log('📊 Event data:', JSON.stringify(event.data.object, null, 2))
 
     // Handle different event types
     switch (event.type) {
       case 'checkout.session.completed':
+        console.log('🛒 Processing checkout.session.completed')
         await handleCheckoutCompleted(event.data.object)
         break
       case 'payment_intent.succeeded':
+        console.log('💳 Processing payment_intent.succeeded')
         await handlePaymentSucceeded(event.data.object)
         break
       case 'invoice.payment_succeeded':
+        console.log('📄 Processing invoice.payment_succeeded')
         await handleInvoicePaymentSucceeded(event.data.object)
         break
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
+        console.log('📋 Processing subscription change:', event.type)
         await handleSubscriptionChange(event.data.object)
         break
       case 'customer.subscription.deleted':
+        console.log('🗑️ Processing subscription deletion')
         await handleSubscriptionCancelled(event.data.object)
         break
       default:
-        console.log(`Unhandled event type: ${event.type}`)
+        console.log(`⚠️ Unhandled event type: ${event.type}`)
     }
 
+    console.log('✅ Webhook processing completed successfully')
     return NextResponse.json({ received: true })
   } catch (error) {
-    console.error('Webhook error:', error)
+    console.error('💥 Webhook error:', error)
     return NextResponse.json(
       { error: 'Webhook handler failed' },
       { status: 500 }
@@ -66,6 +81,13 @@ export async function POST(req: NextRequest) {
 async function handleCheckoutCompleted(session: any) {
   try {
     console.log('Checkout completed:', session.id)
+    console.log('Session details:', {
+      mode: session.mode,
+      customer_email: session.customer_email,
+      metadata: session.metadata,
+      subscription: session.subscription,
+      customer: session.customer
+    })
     
     const customerEmail = session.customer_email
     const metadata = session.metadata || {}
@@ -102,8 +124,9 @@ async function handleCheckoutCompleted(session: any) {
       // Lifetime subscription
       await grantLifetimeAccess(foundUser.id, subscriptionTier, session)
     } else if (session.mode === 'subscription') {
-      // Monthly subscription - will be handled by subscription events
-      console.log('Monthly subscription created, will be handled by subscription events')
+      // Monthly subscription - update immediately since subscription is active
+      console.log('Monthly subscription created, updating subscription tier immediately')
+      await updateUserSubscriptionTier(foundUser.id, subscriptionTier, false, session.customer)
     } else {
       // One-time payment for subscription tier
       await updateUserSubscriptionTier(foundUser.id, subscriptionTier)
@@ -177,9 +200,26 @@ async function handleSubscriptionChange(subscription: any) {
       
       if (foundUser) {
         if (subscription.status === 'active') {
-          await updateUserSubscriptionTier(foundUser.id, subscriptionTier)
+          await updateUserSubscriptionTier(foundUser.id, subscriptionTier, false, subscription.customer)
+          
+          // Also update the payments table with subscription info
+          const { error: paymentUpdateError } = await supabase
+            .from('payments')
+            .update({
+              subscription_tier: subscriptionTier,
+              stripe_subscription_id: subscription.id,
+              stripe_customer_id: subscription.customer,
+              billing_interval: 'month',
+              next_billing_date: new Date(subscription.current_period_end * 1000).toISOString()
+            })
+            .eq('user_id', foundUser.id)
+            .eq('stripe_subscription_id', subscription.id)
+
+          if (paymentUpdateError) {
+            console.error('Error updating payment record:', paymentUpdateError)
+          }
         }
-        console.log('Subscription status updated for user:', foundUser.id, 'Status:', subscription.status)
+        console.log('Subscription status updated for user:', foundUser.id, 'Status:', subscription.status, 'Tier:', subscriptionTier)
       }
     }
   } catch (error) {
@@ -304,26 +344,38 @@ async function grantLifetimeAccess(userId: string, subscriptionTier: string, ses
 
 async function savePaymentRecord(userId: string, session: any, planType: string, subscriptionTier: string) {
   try {
+    const paymentData: any = {
+      user_id: userId,
+      amount: session.amount_total,
+      currency: session.currency?.toUpperCase() || 'SEK',
+      status: 'succeeded',
+      subscription_tier: subscriptionTier,
+      plan_type: planType,
+      stripe_customer_id: session.customer,
+      metadata: {
+        planType,
+        sessionId: session.id,
+        mode: session.mode
+      }
+    }
+
+    // Add subscription-specific fields for monthly plans
+    if (session.mode === 'subscription') {
+      paymentData.billing_interval = 'month'
+      paymentData.stripe_subscription_id = session.subscription
+    } else {
+      paymentData.stripe_payment_intent_id = session.payment_intent
+      paymentData.billing_interval = planType.includes('lifetime') ? 'lifetime' : 'none'
+    }
+
     const { error: paymentError } = await supabase
       .from('payments')
-      .insert({
-        user_id: userId,
-        stripe_payment_intent_id: session.payment_intent,
-        amount: session.amount_total,
-        currency: session.currency?.toUpperCase() || 'SEK',
-        status: 'succeeded',
-        subscription_tier: subscriptionTier,
-        metadata: {
-          planType,
-          sessionId: session.id,
-          mode: session.mode
-        }
-      })
+      .insert(paymentData)
 
     if (paymentError) {
       console.error('Error saving payment:', paymentError)
     } else {
-      console.log('Payment record saved successfully')
+      console.log('Payment record saved successfully for plan:', planType)
     }
   } catch (error) {
     console.error('Error saving payment record:', error)

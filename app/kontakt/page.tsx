@@ -208,11 +208,11 @@ export default function ContactPage() {
                   <div className="flex items-center gap-2">
                     <Mail className="h-4 w-4 text-purple-600" />
                     <span className="text-sm">Dedikerad kontoansvarig</span>
-                  </div>
+                </div>
                   <div className="flex items-center gap-2">
                     <Phone className="h-4 w-4 text-purple-600" />
                     <span className="text-sm">24/7 telefonsupport</span>
-                  </div>
+                </div>
                   <div className="flex items-center gap-2">
                     <MessageCircle className="h-4 w-4 text-purple-600" />
                     <span className="text-sm">SLA-garanti 99.9%</span>
@@ -221,7 +221,7 @@ export default function ContactPage() {
               </CardContent>
             </Card>
 
-            {/* Contact Info */}
+          {/* Contact Info */}
             <Card>
               <CardHeader>
                 <CardTitle>Kontaktinformation</CardTitle>
@@ -241,18 +241,18 @@ export default function ContactPage() {
                     <p className="font-medium">Telefon</p>
                     <p className="text-sm text-muted-foreground">08-123 456 78</p>
                   </div>
-                </div>
+                      </div>
                 
                 <div className="flex items-center gap-3">
                   <MapPin className="h-5 w-5 text-muted-foreground" />
-                  <div>
+                      <div>
                     <p className="font-medium">Adress</p>
                     <p className="text-sm text-muted-foreground">
                       Storgatan 123<br />
                       111 22 Stockholm
                     </p>
-                  </div>
-                </div>
+                      </div>
+                    </div>
               </CardContent>
             </Card>
           </div>
@@ -272,7 +272,7 @@ export default function ContactPage() {
                     <div className="space-y-2">
                       <Label htmlFor="name">Namn</Label>
                       <Input id="name" placeholder="Ditt namn" />
-                    </div>
+                      </div>
                     <div className="space-y-2">
                       <Label htmlFor="email">E-post</Label>
                       <Input id="email" type="email" placeholder="din@email.se" />
