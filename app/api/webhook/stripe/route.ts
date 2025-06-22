@@ -80,70 +80,148 @@ export async function POST(req: NextRequest) {
 
 async function handleCheckoutCompleted(session: any) {
   try {
-    console.log('Checkout completed:', session.id)
-    console.log('Session details:', {
+    console.log('🛒 Checkout completed:', session.id)
+    console.log('📊 Session details:', {
       mode: session.mode,
       customer_email: session.customer_email,
       metadata: session.metadata,
       subscription: session.subscription,
-      customer: session.customer
+      customer: session.customer,
+      amount_total: session.amount_total
     })
     
     const customerEmail = session.customer_email
     const metadata = session.metadata || {}
-    const planType = metadata.planType
-    const subscriptionTier = metadata.subscriptionTier || 'free'
-    const isLifetime = metadata.isLifetime === 'true'
     
     if (!customerEmail) {
-      console.error('No customer email found in session')
+      console.error('❌ No customer email found in session')
       return
     }
 
     // Find user by email
-    const { data: user, error: userError } = await supabase.auth.admin.listUsers()
-    if (userError) {
-      console.error('Error fetching users:', userError)
+    const foundUser = await findUserByEmail(customerEmail)
+    if (!foundUser) {
+      console.error('❌ User not found for email:', customerEmail)
       return
     }
 
-    const foundUser = user.users.find(u => u.email === customerEmail)
-    if (!foundUser) {
-      console.error('User not found for email:', customerEmail)
-      return
+    console.log('✅ Found user:', foundUser.id, 'for email:', customerEmail)
+
+    // Determine subscription tier from metadata or amount
+    let subscriptionTier = 'free'
+    let planType = 'unknown'
+    
+    if (metadata.planType) {
+      planType = metadata.planType
+      if (planType.includes('pro')) {
+        subscriptionTier = 'pro'
+      } else if (planType.includes('enterprise')) {
+        subscriptionTier = 'enterprise'
+      }
+    } else {
+      // Fallback: determine from amount
+      const amount = session.amount_total / 100 // Convert from cents
+      if (amount === 99) {
+        subscriptionTier = 'pro'
+        planType = 'pro_monthly'
+      } else if (amount === 299) {
+        subscriptionTier = 'enterprise'
+        planType = 'enterprise_monthly'
+      } else if (amount === 1990) {
+        subscriptionTier = 'pro'
+        planType = 'pro_lifetime'
+      } else if (amount === 4990) {
+        subscriptionTier = 'enterprise'
+        planType = 'enterprise_lifetime'
+      }
     }
+
+    console.log('🎯 Determined plan:', planType, 'tier:', subscriptionTier)
 
     // Handle different payment types
     if (planType === 'extra_cv') {
-      // Extra CV credit
       await grantExtraCVCredit(foundUser.id)
     } else if (planType === 'single_export') {
-      // Single export credit
       await grantExportCredit(foundUser.id)
-    } else if (isLifetime) {
-      // Lifetime subscription
+    } else if (planType.includes('lifetime')) {
       await grantLifetimeAccess(foundUser.id, subscriptionTier, session)
-    } else if (session.mode === 'subscription') {
-      // Monthly subscription - update immediately since subscription is active
-      console.log('Monthly subscription created, updating subscription tier immediately')
-      await updateUserSubscriptionTier(foundUser.id, subscriptionTier, false, session.customer)
-    } else {
-      // One-time payment for subscription tier
-      await updateUserSubscriptionTier(foundUser.id, subscriptionTier)
+    } else if (session.mode === 'subscription' || planType.includes('monthly')) {
+      // Monthly subscription - update immediately
+      console.log('💳 Monthly subscription created, updating subscription tier immediately')
+      await updateUserSubscriptionTier(foundUser.id, subscriptionTier, session)
     }
 
     // Save payment record
     await savePaymentRecord(foundUser.id, session, planType, subscriptionTier)
 
-    console.log('Payment processed successfully for user:', foundUser.id, 'Plan:', planType)
+    console.log('✅ Payment processed successfully for user:', foundUser.id, 'Plan:', planType, 'Tier:', subscriptionTier)
   } catch (error) {
-    console.error('Error handling checkout completed:', error)
+    console.error('💥 Error handling checkout completed:', error)
+  }
+}
+
+async function findUserByEmail(email: string) {
+  try {
+    const { data: user, error: userError } = await supabase.auth.admin.listUsers()
+    if (userError) {
+      console.error('Error fetching users:', userError)
+      return null
+    }
+
+    return user.users.find(u => u.email === email)
+  } catch (error) {
+    console.error('Error finding user by email:', error)
+    return null
+  }
+}
+
+async function updateUserSubscriptionTier(userId: string, subscriptionTier: string, session: any) {
+  try {
+    console.log('🔄 Updating subscription tier for user:', userId, 'to:', subscriptionTier)
+    
+    // Update karriar_profiles table
+    const { error: profileError } = await supabase
+      .from('karriar_profiles')
+      .update({
+        subscription_tier: subscriptionTier,
+        subscription_status: 'active',
+        stripe_customer_id: session.customer,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId)
+
+    if (profileError) {
+      console.error('❌ Error updating profile subscription tier:', profileError)
+      return false
+    }
+
+    // Also update payments table to reflect current subscription
+    const { error: paymentError } = await supabase
+      .from('payments')
+      .update({
+        subscription_tier: subscriptionTier,
+        status: 'succeeded'
+      })
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    if (paymentError) {
+      console.error('⚠️ Error updating payment subscription tier:', paymentError)
+      // Don't return false here as profile update succeeded
+    }
+
+    console.log('✅ Successfully updated subscription tier to:', subscriptionTier, 'for user:', userId)
+    return true
+  } catch (error) {
+    console.error('💥 Error updating subscription tier:', error)
+    return false
   }
 }
 
 async function handlePaymentSucceeded(paymentIntent: any) {
   try {
-    console.log('Payment succeeded:', paymentIntent.id)
+    console.log('💳 Payment succeeded:', paymentIntent.id)
     
     // Update payment status if it exists in database
     const { error } = await supabase
@@ -161,7 +239,7 @@ async function handlePaymentSucceeded(paymentIntent: any) {
 
 async function handleInvoicePaymentSucceeded(invoice: any) {
   try {
-    console.log('Invoice payment succeeded:', invoice.id)
+    console.log('📄 Invoice payment succeeded:', invoice.id)
     
     // Handle recurring subscription payments
     if (!stripe) return
@@ -172,12 +250,11 @@ async function handleInvoicePaymentSucceeded(invoice: any) {
       const customerEmail = subscription.metadata.email
       
       if (customerEmail && subscriptionTier) {
-        const { data: user } = await supabase.auth.admin.listUsers()
-        const foundUser = user?.users.find(u => u.email === customerEmail)
+        const foundUser = await findUserByEmail(customerEmail)
         
         if (foundUser) {
-          await updateUserSubscriptionTier(foundUser.id, subscriptionTier)
-          console.log('Recurring payment processed for user:', foundUser.id)
+          await updateUserSubscriptionTier(foundUser.id, subscriptionTier, { customer: subscription.customer })
+          console.log('✅ Recurring payment processed for user:', foundUser.id)
         }
       }
     }
@@ -188,21 +265,20 @@ async function handleInvoicePaymentSucceeded(invoice: any) {
 
 async function handleSubscriptionChange(subscription: any) {
   try {
-    console.log('Subscription changed:', subscription.id, subscription.status)
+    console.log('📋 Subscription changed:', subscription.id, subscription.status)
     
     const metadata = subscription.metadata || {}
     const customerEmail = metadata.email
     const subscriptionTier = metadata.subscriptionTier
     
     if (customerEmail && subscriptionTier) {
-      const { data: user } = await supabase.auth.admin.listUsers()
-      const foundUser = user?.users.find(u => u.email === customerEmail)
+      const foundUser = await findUserByEmail(customerEmail)
       
       if (foundUser) {
         if (subscription.status === 'active') {
-          await updateUserSubscriptionTier(foundUser.id, subscriptionTier, false, subscription.customer)
+          await updateUserSubscriptionTier(foundUser.id, subscriptionTier, { customer: subscription.customer })
           
-          // Also update the payments table with subscription info
+          // Update the payments table with subscription info
           const { error: paymentUpdateError } = await supabase
             .from('payments')
             .update({
@@ -210,16 +286,18 @@ async function handleSubscriptionChange(subscription: any) {
               stripe_subscription_id: subscription.id,
               stripe_customer_id: subscription.customer,
               billing_interval: 'month',
-              next_billing_date: new Date(subscription.current_period_end * 1000).toISOString()
+              next_billing_date: new Date(subscription.current_period_end * 1000).toISOString(),
+              status: 'succeeded'
             })
             .eq('user_id', foundUser.id)
-            .eq('stripe_subscription_id', subscription.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
 
           if (paymentUpdateError) {
             console.error('Error updating payment record:', paymentUpdateError)
           }
         }
-        console.log('Subscription status updated for user:', foundUser.id, 'Status:', subscription.status, 'Tier:', subscriptionTier)
+        console.log('✅ Subscription status updated for user:', foundUser.id, 'Status:', subscription.status, 'Tier:', subscriptionTier)
       }
     }
   } catch (error) {
@@ -229,19 +307,18 @@ async function handleSubscriptionChange(subscription: any) {
 
 async function handleSubscriptionCancelled(subscription: any) {
   try {
-    console.log('Subscription cancelled:', subscription.id)
+    console.log('🗑️ Subscription cancelled:', subscription.id)
     
     const metadata = subscription.metadata || {}
     const customerEmail = metadata.email
     
     if (customerEmail) {
-      const { data: user } = await supabase.auth.admin.listUsers()
-      const foundUser = user?.users.find(u => u.email === customerEmail)
+      const foundUser = await findUserByEmail(customerEmail)
       
       if (foundUser) {
         // Downgrade to free tier
-        await updateUserSubscriptionTier(foundUser.id, 'free')
-        console.log('User downgraded to free tier:', foundUser.id)
+        await updateUserSubscriptionTier(foundUser.id, 'free', { customer: subscription.customer })
+        console.log('✅ User downgraded to free tier:', foundUser.id)
       }
     }
   } catch (error) {
@@ -278,7 +355,7 @@ async function grantExtraCVCredit(userId: string) {
       return
     }
 
-    console.log(`Granted 1 extra CV credit to user ${userId}. Total credits: ${currentCredits + 1}`)
+    console.log(`✅ Granted 1 extra CV credit to user ${userId}. Total credits: ${currentCredits + 1}`)
   } catch (error) {
     console.error('Error granting extra CV credit:', error)
   }
@@ -312,7 +389,7 @@ async function grantExportCredit(userId: string) {
       return
     }
 
-    console.log(`Granted 1 export credit to user ${userId}. Total credits: ${currentCredits + 1}`)
+    console.log(`✅ Granted 1 export credit to user ${userId}. Total credits: ${currentCredits + 1}`)
   } catch (error) {
     console.error('Error granting export credit:', error)
   }
@@ -327,6 +404,7 @@ async function grantLifetimeAccess(userId: string, subscriptionTier: string, ses
         subscription_tier: subscriptionTier,
         subscription_status: 'lifetime',
         lifetime_access: true,
+        stripe_customer_id: session.customer,
         updated_at: new Date().toISOString()
       })
       .eq('id', userId)
@@ -336,7 +414,7 @@ async function grantLifetimeAccess(userId: string, subscriptionTier: string, ses
       return
     }
 
-    console.log(`Granted lifetime ${subscriptionTier} access to user ${userId}`)
+    console.log(`✅ Granted lifetime ${subscriptionTier} access to user ${userId}`)
   } catch (error) {
     console.error('Error granting lifetime access:', error)
   }
@@ -373,11 +451,11 @@ async function savePaymentRecord(userId: string, session: any, planType: string,
       .insert(paymentData)
 
     if (paymentError) {
-      console.error('Error saving payment:', paymentError)
+      console.error('❌ Error saving payment:', paymentError)
     } else {
-      console.log('Payment record saved successfully for plan:', planType)
+      console.log('✅ Payment record saved successfully for plan:', planType)
     }
   } catch (error) {
-    console.error('Error saving payment record:', error)
+    console.error('💥 Error saving payment record:', error)
   }
 } 
