@@ -1,20 +1,23 @@
 import Stripe from "stripe"
 
-// Check if Stripe keys are available
-const hasStripeKeys = process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.startsWith('sk_')
+// Check if we're on the server side
+const isServer = typeof window === 'undefined'
 
-if (!hasStripeKeys && process.env.NODE_ENV === 'production') {
-  throw new Error('STRIPE_SECRET_KEY is not set in environment variables')
+// Check if Stripe keys are available (only on server)
+const hasStripeKeys = isServer && process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.startsWith('sk_')
+
+if (!hasStripeKeys && process.env.NODE_ENV === 'production' && isServer) {
+  console.warn('⚠️  STRIPE_SECRET_KEY is not set in environment variables. Payment features will be disabled.')
 }
 
-// Initialize Stripe only if keys are available
+// Initialize Stripe only if keys are available and we're on server
 export const stripe = hasStripeKeys 
   ? new Stripe(process.env.STRIPE_SECRET_KEY!, {
       apiVersion: "2024-12-18.acacia",
 })
   : null
 
-if (!hasStripeKeys) {
+if (!hasStripeKeys && isServer) {
   console.warn('⚠️  Stripe not initialized: STRIPE_SECRET_KEY not found or invalid. Payment features will be disabled.')
 }
 

@@ -173,14 +173,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         console.warn("Database error:", error.code, error.message)
         
-        // If table doesn't exist or profile not found, create a default profile
+        // If table doesn't exist or profile not found, create a fallback profile
         if (error.code === '42P01') {
           console.warn("KarriärAI profiles table doesn't exist. Please run the database setup.")
           setError("Databas inte konfigurerad. Gå till /setup/databas för att konfigurera.")
         } else if (error.code === 'PGRST116') {
-          console.warn("Profile not found, attempting to create one")
-          await createUserProfile(userId)
-          return // createUserProfile will set the profile
+          console.warn("Profile not found, creating fallback profile")
+          // Don't try to create in database, just set a fallback profile
+          const userEmail = user?.email || ''
+          const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Användare'
+          
+          setProfile({
+            id: userId,
+            email: userEmail,
+            full_name: userName,
+            subscription_tier: 'free' as const,
+            subscription_status: 'inactive' as const,
+            role: 'user' as const,
+            email_notifications: true,
+            marketing_emails: false,
+            profile_visibility: 'private' as const,
+            job_search_status: 'not_looking' as const,
+            remote_work_preference: 'hybrid' as const,
+            onboarding_completed: false
+          })
+          setError(null)
         } else {
           console.error("Unexpected database error:", error)
           setError("Databasfel: " + error.message)
@@ -203,6 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             remote_work_preference: 'hybrid' as const,
             onboarding_completed: false
           })
+          setError(null) // Clear error since we have a fallback profile
         }
       } else {
         console.log("Profile fetched successfully:", data)
@@ -231,6 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         remote_work_preference: 'hybrid' as const,
         onboarding_completed: false
       })
+      setError(null) // Clear error since we have a fallback profile
     } finally {
       setLoading(false)
     }
