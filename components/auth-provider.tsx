@@ -63,7 +63,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         setUser(session?.user ?? null)
         if (session?.user) {
-          await fetchProfile(session.user.id)
+          // Always set a fallback profile first to prevent loops
+          const fallbackProfile = {
+            id: session.user.id,
+            email: session.user.email || '',
+            full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Användare',
+            subscription_tier: 'free' as const,
+            subscription_status: 'active' as const,
+            role: 'user' as const,
+            email_notifications: true,
+            marketing_emails: false,
+            profile_visibility: 'private' as const,
+            job_search_status: 'not_looking' as const,
+            remote_work_preference: 'hybrid' as const,
+            onboarding_completed: false
+          }
+          
+          setProfile(fallbackProfile)
+          setError(null)
+          setLoading(false)
+          
+          // Then try to fetch real profile from database (but don't block login)
+          try {
+            await fetchProfile(session.user.id, session.user)
+          } catch (profileError) {
+            console.warn("Profile fetch failed during init, using fallback:", profileError)
+          }
         } else {
           setLoading(false)
         }
@@ -85,9 +110,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         setUser(session?.user ?? null)
         if (session?.user) {
-          await fetchProfile(session.user.id)
-          // Make sure loading is set to false after successful login
+          // Always set a fallback profile first to prevent loops
+          const fallbackProfile = {
+            id: session.user.id,
+            email: session.user.email || '',
+            full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Användare',
+            subscription_tier: 'free' as const,
+            subscription_status: 'active' as const,
+            role: 'user' as const,
+            email_notifications: true,
+            marketing_emails: false,
+            profile_visibility: 'private' as const,
+            job_search_status: 'not_looking' as const,
+            remote_work_preference: 'hybrid' as const,
+            onboarding_completed: false
+          }
+          
+          setProfile(fallbackProfile)
+          setError(null)
           setLoading(false)
+          
+          // Then try to fetch real profile from database (but don't block login)
+          try {
+            await fetchProfile(session.user.id, session.user)
+          } catch (profileError) {
+            console.warn("Profile fetch failed, using fallback:", profileError)
+            // Fallback is already set, so just log the error
+          }
         } else {
           setProfile(null)
           setError(null) // Clear errors when logged out
@@ -141,12 +190,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, authUser?: any) => {
     if (!supabase) {
       console.warn("Supabase not configured, using user data from auth")
       // Use actual user data from Supabase Auth
-      const userEmail = user?.email || ''
-      const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Användare'
+      const userEmail = authUser?.email || user?.email || ''
+      const userName = authUser?.user_metadata?.full_name || user?.user_metadata?.full_name || authUser?.email?.split('@')[0] || user?.email?.split('@')[0] || 'Användare'
       
       setProfile({
         id: userId,
@@ -180,8 +229,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else if (error.code === 'PGRST116') {
           console.warn("Profile not found, creating fallback profile")
           // Don't try to create in database, just set a fallback profile
-          const userEmail = user?.email || ''
-          const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Användare'
+          const userEmail = authUser?.email || user?.email || ''
+          const userName = authUser?.user_metadata?.full_name || user?.user_metadata?.full_name || authUser?.email?.split('@')[0] || user?.email?.split('@')[0] || 'Användare'
           
           setProfile({
             id: userId,
@@ -203,8 +252,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setError("Databasfel: " + error.message)
           
           // Fallback: set a profile using real user data
-          const userEmail = user?.email || ''
-          const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Användare'
+          const userEmail = authUser?.email || user?.email || ''
+          const userName = authUser?.user_metadata?.full_name || user?.user_metadata?.full_name || authUser?.email?.split('@')[0] || user?.email?.split('@')[0] || 'Användare'
           
           setProfile({
             id: userId,
@@ -232,8 +281,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError("Ett oväntat fel uppstod vid hämtning av profil")
       
       // Set a fallback profile using real user data
-      const userEmail = user?.email || ''
-      const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Användare'
+      const userEmail = authUser?.email || user?.email || ''
+      const userName = authUser?.user_metadata?.full_name || user?.user_metadata?.full_name || authUser?.email?.split('@')[0] || user?.email?.split('@')[0] || 'Användare'
       
       setProfile({
         id: userId,
@@ -251,7 +300,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
       setError(null) // Clear error since we have a fallback profile
     } finally {
-      setLoading(false)
+      // Don't set loading to false here since it's handled in auth state change
+      // setLoading(false)
     }
   }
 
