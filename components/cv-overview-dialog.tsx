@@ -11,7 +11,7 @@ import { useAuth } from "@/components/auth-provider"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { sv } from "date-fns/locale"
-import { getSubscriptionLimits, getUserSubscriptionTier } from "@/lib/subscription-helpers"
+import { getSubscriptionLimits, getUserSubscriptionInfo } from "@/lib/subscription-helpers"
 
 interface CV {
   id: string
