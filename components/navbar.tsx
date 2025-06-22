@@ -154,9 +154,10 @@ export function Navbar() {
               alt="KarriärAI Logo" 
               width={40} 
               height={40}
-              className="h-10 w-auto"
+              className="h-8 w-auto sm:h-10"
+              priority
             />
-            <span className="font-bold text-xl">KarriärAI</span>
+            <span className="font-bold text-lg sm:text-xl">KarriärAI</span>
           </Link>
 
           {/* Desktop Navigation */}
