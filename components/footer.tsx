@@ -1,4 +1,5 @@
 import Link from "next/link"
+import Image from "next/image"
 import { Facebook, Twitter, Instagram, Linkedin, Mail } from "lucide-react"
 
 export function Footer() {
@@ -8,10 +9,14 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-blue-600 to-emerald-600 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">K</span>
-              </div>
+            <div className="flex items-center space-x-3">
+              <Image 
+                src="/logo.png" 
+                alt="KarriärAI Logo" 
+                width={40} 
+                height={40}
+                className="h-10 w-auto"
+              />
               <span className="font-bold text-xl">KarriärAI</span>
             </div>
             <p className="text-sm text-muted-foreground">

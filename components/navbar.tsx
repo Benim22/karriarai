@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Menu, User, LogOut, Settings, FileText, AlertTriangle, X } from "lucide-react"
@@ -147,10 +148,14 @@ export function Navbar() {
         <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2 cursor-pointer">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-blue-600 to-emerald-600 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">K</span>
-            </div>
+          <Link href="/" className="flex items-center space-x-3 cursor-pointer">
+            <Image 
+              src="/logo.png" 
+              alt="KarriärAI Logo" 
+              width={40} 
+              height={40}
+              className="h-10 w-auto"
+            />
             <span className="font-bold text-xl">KarriärAI</span>
           </Link>
 
