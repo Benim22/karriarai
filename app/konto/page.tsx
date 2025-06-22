@@ -36,9 +36,18 @@ import {
   CheckCircle,
   AlertCircle,
   Sparkles,
-  Wand2
+  Wand2,
+  Download,
+  FileText,
+  Calendar,
+  MessageCircle,
+  Brain,
+  Target,
+  TrendingUp,
+  Users
 } from "lucide-react"
 import type { UserProfile } from "@/types/user"
+import { Progress } from "@/components/ui/progress"
 
 export default function KontoPage() {
   const { user, profile, updateProfile, loading, error } = useAuth()
@@ -231,10 +240,17 @@ export default function KontoPage() {
       )}
 
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="profile">Profil</TabsTrigger>
           <TabsTrigger value="preferences">Preferenser</TabsTrigger>
           <TabsTrigger value="subscription">Prenumeration</TabsTrigger>
+          <TabsTrigger value="career" disabled={profile?.subscription_tier === 'free'}>
+            Karriärrådgivning
+          </TabsTrigger>
+          <TabsTrigger value="team" disabled={profile?.subscription_tier !== 'enterprise'}>
+            Team
+          </TabsTrigger>
+          <TabsTrigger value="exports">Exporter</TabsTrigger>
           <TabsTrigger value="settings">Inställningar</TabsTrigger>
         </TabsList>
 
@@ -598,6 +614,193 @@ export default function KontoPage() {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Career Guidance Tab - Pro Feature */}
+        <TabsContent value="career" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Brain className="h-5 w-5" />
+                Personlig Karriärrådgivning
+              </CardTitle>
+              <CardDescription>
+                AI-driven vägledning för din karriärutveckling
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Career Assessment */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Target className="h-5 w-5" />
+                  Karriärbedömning
+                </h3>
+                <div className="grid gap-4">
+                  <Card className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium">CV-styrka</span>
+                      <Badge variant="secondary">85%</Badge>
+                    </div>
+                    <Progress value={85} className="mb-2" />
+                    <p className="text-sm text-muted-foreground">
+                      Ditt CV är starkt men kan förbättras med fler kvantifierade resultat
+                    </p>
+                  </Card>
+                  
+                  <Card className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium">Jobbmatchning</span>
+                      <Badge variant="secondary">72%</Badge>
+                    </div>
+                    <Progress value={72} className="mb-2" />
+                    <p className="text-sm text-muted-foreground">
+                      Överväg att lägga till fler tekniska färdigheter för bättre matchning
+                    </p>
+                  </Card>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* AI Recommendations */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  AI-rekommendationer
+                </h3>
+                <div className="space-y-3">
+                  <Card className="p-4 bg-blue-50 border-blue-200">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-blue-100 rounded-full">
+                        <FileText className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-blue-900">Förbättra din sammanfattning</h4>
+                        <p className="text-sm text-blue-700 mt-1">
+                          Lägg till fler specifika resultat och använd kraftfullare aktionsverb
+                        </p>
+                        <Button size="sm" variant="outline" className="mt-2">
+                          Förbättra nu
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+
+                  <Card className="p-4 bg-green-50 border-green-200">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-green-100 rounded-full">
+                        <Target className="h-4 w-4 text-green-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-green-900">Nya jobbmöjligheter</h4>
+                        <p className="text-sm text-green-700 mt-1">
+                          3 nya jobb som matchar din profil har publicerats denna vecka
+                        </p>
+                        <Button size="sm" variant="outline" className="mt-2">
+                          Visa jobb
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Career Chat */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <MessageCircle className="h-5 w-5" />
+                  Karriärchatt
+                </h3>
+                <Card className="p-4">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Få personlig vägledning från vår AI-karriärcoach
+                  </p>
+                  <Button className="w-full">
+                    Starta karriärchatt
+                  </Button>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Team Management Tab - Enterprise Feature */}
+        <TabsContent value="team" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Teamhantering
+              </CardTitle>
+              <CardDescription>
+                Hantera ditt team och analysera CV:n i bulk
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Team Overview */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="p-4">
+                  <div className="text-2xl font-bold">12</div>
+                  <div className="text-sm text-muted-foreground">Aktiva användare</div>
+                </Card>
+                <Card className="p-4">
+                  <div className="text-2xl font-bold">48</div>
+                  <div className="text-sm text-muted-foreground">CV skapade</div>
+                </Card>
+                <Card className="p-4">
+                  <div className="text-2xl font-bold">156</div>
+                  <div className="text-sm text-muted-foreground">Exporter</div>
+                </Card>
+              </div>
+
+              <Separator />
+
+              {/* Bulk Analysis */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Bulk CV-analys</h3>
+                <Card className="p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="font-medium">Senaste analys</span>
+                    <Badge>Klar</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Analyserade 15 CV:n för utvecklarroller
+                  </p>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline">
+                      <Download className="h-4 w-4 mr-2" />
+                      Ladda ner rapport
+                    </Button>
+                    <Button size="sm">
+                      Ny analys
+                    </Button>
+                  </div>
+                </Card>
+              </div>
+
+              <Separator />
+
+              {/* API Access */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">API-åtkomst</h3>
+                <Card className="p-4">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Integrera KarriarAI med dina befintliga system
+                  </p>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline">
+                      API-dokumentation
+                    </Button>
+                    <Button size="sm" variant="outline">
+                      Generera API-nyckel
+                    </Button>
+                  </div>
+                </Card>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

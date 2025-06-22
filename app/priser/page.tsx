@@ -3,25 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
-import { Check, Star, Zap, Crown } from "lucide-react"
+import { Check, Zap, Crown } from "lucide-react"
 import Link from "next/link"
 
 const plans = [
-  {
-    name: "Gratis",
-    price: "0",
-    description: "Perfekt för att komma igång",
-    features: [
-      "1 CV-mall",
-      "Grundläggande redigering",
-      "PDF-export",
-      "Grundläggande jobbmatchning",
-      "E-postsupport"
-    ],
-    icon: Star,
-    popular: false,
-    cta: "Kom igång gratis"
-  },
   {
     name: "Pro",
     price: "99",
@@ -76,7 +61,7 @@ export default function PricingPage() {
         </div>
 
         {/* Pricing Cards */}
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           {plans.map((plan) => {
             const Icon = plan.icon
             return (
@@ -144,6 +129,18 @@ export default function PricingPage() {
               <h3 className="text-lg font-semibold mb-2">Vad händer med mina CV när jag avbryter?</h3>
               <p className="text-muted-foreground">
                 Dina CV sparas säkert i 90 dagar efter avbrytandet. Du kan exportera dem eller återaktivera ditt konto under denna period.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Vad ingår i personlig karriärrådgivning?</h3>
+              <p className="text-muted-foreground">
+                Pro-användare får tillgång till personlig karriärrådgivning via AI-driven vägledning, CV-optimering och jobbsökningsstrategier.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Hur fungerar teamhantering i Enterprise?</h3>
+              <p className="text-muted-foreground">
+                Enterprise-kunder kan hantera flera användare, analysera CV:n i bulk och få dedikerad support för sina rekryteringsbehov.
               </p>
             </div>
           </div>

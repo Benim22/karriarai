@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { Navbar } from "@/components/navbar"
@@ -19,29 +19,11 @@ const mockCVs = [
 
 const mockExports: any[] = []
 
-export default function DashboardPage() {
-  const { user, profile, loading } = useAuth()
+// Separate component for handling search params
+function PaymentNotificationHandler() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [cvs, setCvs] = useState(mockCVs)
-  const [exports, setExports] = useState(mockExports)
-  const [dataLoading, setDataLoading] = useState(true)
 
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push("/auth/login?redirectTo=/dashboard")
-    }
-  }, [user, loading, router])
-
-  // Fetch user data when authenticated
-  useEffect(() => {
-    if (user && !loading) {
-      fetchUserData()
-    }
-  }, [user, loading])
-
-  // Handle payment notifications
   useEffect(() => {
     const payment = searchParams.get('payment')
     const type = searchParams.get('type')
@@ -72,6 +54,30 @@ export default function DashboardPage() {
       router.replace('/dashboard')
     }
   }, [searchParams, router])
+
+  return null
+}
+
+function DashboardPageContent() {
+  const { user, profile, loading } = useAuth()
+  const router = useRouter()
+  const [cvs, setCvs] = useState(mockCVs)
+  const [exports, setExports] = useState(mockExports)
+  const [dataLoading, setDataLoading] = useState(true)
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/auth/login?redirectTo=/dashboard")
+    }
+  }, [user, loading, router])
+
+  // Fetch user data when authenticated
+  useEffect(() => {
+    if (user && !loading) {
+      fetchUserData()
+    }
+  }, [user, loading])
 
   const fetchUserData = async () => {
     try {
@@ -124,6 +130,9 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+      <Suspense fallback={null}>
+        <PaymentNotificationHandler />
+      </Suspense>
       <DashboardContent 
         cvs={cvs} 
         exports={exports} 
@@ -135,5 +144,20 @@ export default function DashboardPage() {
         }} 
       />
     </div>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Laddar dashboard...</p>
+        </div>
+      </div>
+    }>
+      <DashboardPageContent />
+    </Suspense>
   )
 }

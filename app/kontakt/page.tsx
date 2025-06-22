@@ -7,9 +7,23 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
-import { Mail, Phone, MapPin, Clock, MessageSquare, Users, Briefcase, HelpCircle, Sparkles, Loader2 } from "lucide-react"
+import { 
+  Mail, 
+  Phone, 
+  MapPin, 
+  Clock,
+  MessageCircle,
+  Star,
+  Zap,
+  Crown,
+  HelpCircle,
+  Briefcase,
+  Users,
+  MessageSquare
+} from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 const contactInfo = [
@@ -107,146 +121,192 @@ export default function ContactPage() {
             Kontakta oss
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Vi finns här för att hjälpa dig. Skicka ett meddelande så återkommer vi så snart som möjligt.
+            Vi hjälper dig gärna med dina frågor om KarriarAI
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-12">
+        <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          {/* Support Tiers */}
+          <div className="lg:col-span-1 space-y-6">
+            <h2 className="text-2xl font-bold mb-6">Support-nivåer</h2>
+            
+            {/* Free Support */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Star className="h-5 w-5" />
+                  Grundsupport
+                </CardTitle>
+                <CardDescription>För gratisanvändare</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">Svarstid: 48-72 timmar</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">E-postsupport</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">FAQ och hjälpcenter</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Pro Support */}
+            <Card className="border-blue-200 bg-blue-50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-blue-600" />
+                  Prioritetssupport
+                  <Badge className="bg-blue-600">Pro</Badge>
+                </CardTitle>
+                <CardDescription>För Pro-användare</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-medium">Svarstid: 4-8 timmar</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm">Prioriterad e-postsupport</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm">Livechatt vardagar 9-17</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm">Telefonsupport vid akuta ärenden</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Enterprise Support */}
+            <Card className="border-purple-200 bg-purple-50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Crown className="h-5 w-5 text-purple-600" />
+                  Dedikerad support
+                  <Badge className="bg-purple-600">Enterprise</Badge>
+                </CardTitle>
+                <CardDescription>För Enterprise-kunder</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-purple-600" />
+                    <span className="text-sm font-medium">Svarstid: 1-2 timmar</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-purple-600" />
+                    <span className="text-sm">Dedikerad kontoansvarig</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-purple-600" />
+                    <span className="text-sm">24/7 telefonsupport</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4 text-purple-600" />
+                    <span className="text-sm">SLA-garanti 99.9%</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Contact Info */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Kontaktinformation</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <Mail className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">E-post</p>
+                    <p className="text-sm text-muted-foreground">support@karriarai.se</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <Phone className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">Telefon</p>
+                    <p className="text-sm text-muted-foreground">08-123 456 78</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <MapPin className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">Adress</p>
+                    <p className="text-sm text-muted-foreground">
+                      Storgatan 123<br />
+                      111 22 Stockholm
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           {/* Contact Form */}
           <div className="lg:col-span-2">
             <Card>
               <CardHeader>
                 <CardTitle>Skicka ett meddelande</CardTitle>
                 <CardDescription>
-                  Fyll i formuläret nedan så kontaktar vi dig inom 24 timmar
+                  Fyll i formuläret så återkommer vi till dig så snart som möjligt
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">Förnamn</Label>
-                    <Input id="firstName" placeholder="Ditt förnamn" />
+              <CardContent>
+                <form className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Namn</Label>
+                      <Input id="name" placeholder="Ditt namn" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">E-post</Label>
+                      <Input id="email" type="email" placeholder="din@email.se" />
+                    </div>
                   </div>
+                  
                   <div className="space-y-2">
-                    <Label htmlFor="lastName">Efternamn</Label>
-                    <Input id="lastName" placeholder="Ditt efternamn" />
+                    <Label htmlFor="subject">Ämne</Label>
+                    <Input id="subject" placeholder="Vad gäller ditt meddelande?" />
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">E-postadress</Label>
-                  <Input id="email" type="email" placeholder="din@email.se" />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Telefonnummer (valfritt)</Label>
-                  <Input id="phone" type="tel" placeholder="+46 70 123 45 67" />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="subject">Ämne</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Välj ett ämne" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="support">Allmän support</SelectItem>
-                      <SelectItem value="enterprise">Företagslösningar</SelectItem>
-                      <SelectItem value="partnership">Partnerskap</SelectItem>
-                      <SelectItem value="media">Media & Press</SelectItem>
-                      <SelectItem value="other">Övrigt</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="message">Meddelande</Label>
-                  <div className="relative">
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="priority">Prioritet</Label>
+                    <select className="w-full p-2 border border-input rounded-md">
+                      <option value="low">Låg - Allmän fråga</option>
+                      <option value="normal">Normal - Support</option>
+                      <option value="high">Hög - Akut problem (Pro/Enterprise)</option>
+                      <option value="urgent">Brådskande - Kritiskt (Enterprise)</option>
+                    </select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="message">Meddelande</Label>
                     <Textarea 
                       id="message" 
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      placeholder="Berätta hur vi kan hjälpa dig..."
-                      className="min-h-[120px] pr-12"
+                      placeholder="Beskriv ditt ärende så detaljerat som möjligt..."
+                      rows={6}
                     />
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="absolute top-2 right-2 h-8 w-8 p-0"
-                            onClick={improveMessageWithAI}
-                            disabled={aiImproving}
-                          >
-                            {aiImproving ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Sparkles className="h-4 w-4 text-purple-600" />
-                            )}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Förbättra meddelande med AI</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    💡 Klicka på <Sparkles className="h-4 w-4 inline text-purple-600" /> för att förbättra ditt meddelande
-                  </p>
-                </div>
-
-                <Button className="w-full">
-                  Skicka meddelande
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Contact Info */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Kontaktinformation</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {contactInfo.map((info, index) => {
-                  const Icon = info.icon
-                  return (
-                    <div key={index} className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                        <Icon className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">{info.title}</h3>
-                        <p className="text-sm font-medium text-muted-foreground">{info.details}</p>
-                        <p className="text-xs text-muted-foreground">{info.description}</p>
-                      </div>
-                    </div>
-                  )
-                })}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Vad kan vi hjälpa till med?</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {contactReasons.map((reason, index) => {
-                  const Icon = reason.icon
-                  return (
-                    <div key={index} className="flex items-start gap-3">
-                      <Icon className="h-5 w-5 text-primary mt-0.5" />
-                      <div>
-                        <h4 className="font-medium text-sm">{reason.title}</h4>
-                        <p className="text-xs text-muted-foreground">{reason.description}</p>
-                      </div>
-                    </div>
-                  )
-                })}
+                  
+                  <Button type="submit" className="w-full">
+                    Skicka meddelande
+                  </Button>
+                </form>
               </CardContent>
             </Card>
           </div>

@@ -383,4 +383,200 @@ export function searchTemplates(
     template.tags?.some(tag => tag.toLowerCase().includes(lowercaseQuery)) ||
     template.industry?.toLowerCase().includes(lowercaseQuery)
   )
+}
+
+// Hämta anpassade mallar för Enterprise-användare
+export async function getCustomTemplates(userId: string): Promise<CVTemplateWithStats[]> {
+  console.log('🔍 getCustomTemplates called for user:', userId)
+  
+  try {
+    // Kontrollera att användaren har Enterprise-prenumeration
+    const { data: profile } = await supabase
+      .from('karriar_profiles')
+      .select('subscription_tier')
+      .eq('id', userId)
+      .single()
+
+    if (profile?.subscription_tier !== 'enterprise') {
+      console.log('❌ User does not have Enterprise subscription')
+      return []
+    }
+
+    const { data, error } = await supabase
+      .from('custom_cv_templates')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('❌ Error fetching custom templates:', error)
+      return []
+    }
+
+    if (!data || data.length === 0) {
+      console.log('📭 No custom templates found')
+      return []
+    }
+
+    console.log('✅ Processing', data.length, 'custom templates')
+    
+    const processedTemplates = data.map((template) => ({
+      id: template.id,
+      name: template.name,
+      category: 'custom' as const,
+      previewImage: template.preview_image_url || '/templates/custom-template.png',
+      isPremium: true,
+      styles: convertTemplateDataToStyles(template.template_data),
+      downloads: 0, // Custom templates don't have downloads
+      rating: 5.0, // Custom templates get max rating
+      tags: ['Anpassad', 'Enterprise', 'Unik'],
+      industry: 'Anpassad'
+    }))
+
+    console.log('🎉 Returning', processedTemplates.length, 'custom templates')
+    return processedTemplates
+
+  } catch (error) {
+    console.error('💥 Error in getCustomTemplates:', error)
+    return []
+  }
+}
+
+// Skapa anpassad mall för Enterprise-användare
+export async function createCustomTemplate(
+  userId: string, 
+  templateData: {
+    name: string
+    description?: string
+    styles: CVStyles
+    previewImageUrl?: string
+  }
+): Promise<{ success: boolean; templateId?: string; error?: string }> {
+  console.log('🔍 createCustomTemplate called for user:', userId)
+  
+  try {
+    // Kontrollera att användaren har Enterprise-prenumeration
+    const { data: profile } = await supabase
+      .from('karriar_profiles')
+      .select('subscription_tier')
+      .eq('id', userId)
+      .single()
+
+    if (profile?.subscription_tier !== 'enterprise') {
+      return { success: false, error: 'Enterprise subscription required' }
+    }
+
+    const { data, error } = await supabase
+      .from('custom_cv_templates')
+      .insert({
+        user_id: userId,
+        name: templateData.name,
+        description: templateData.description || '',
+        template_data: templateData.styles,
+        preview_image_url: templateData.previewImageUrl,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('❌ Error creating custom template:', error)
+      return { success: false, error: 'Failed to create template' }
+    }
+
+    console.log('✅ Custom template created successfully:', data.id)
+    return { success: true, templateId: data.id }
+
+  } catch (error) {
+    console.error('💥 Error in createCustomTemplate:', error)
+    return { success: false, error: 'Internal server error' }
+  }
+}
+
+// Uppdatera anpassad mall
+export async function updateCustomTemplate(
+  userId: string,
+  templateId: string,
+  templateData: {
+    name?: string
+    description?: string
+    styles?: CVStyles
+    previewImageUrl?: string
+  }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Kontrollera att mallen tillhör användaren
+    const { data: existingTemplate } = await supabase
+      .from('custom_cv_templates')
+      .select('user_id')
+      .eq('id', templateId)
+      .single()
+
+    if (!existingTemplate || existingTemplate.user_id !== userId) {
+      return { success: false, error: 'Template not found or access denied' }
+    }
+
+    const updateData: any = {
+      updated_at: new Date().toISOString()
+    }
+
+    if (templateData.name) updateData.name = templateData.name
+    if (templateData.description) updateData.description = templateData.description
+    if (templateData.styles) updateData.template_data = templateData.styles
+    if (templateData.previewImageUrl) updateData.preview_image_url = templateData.previewImageUrl
+
+    const { error } = await supabase
+      .from('custom_cv_templates')
+      .update(updateData)
+      .eq('id', templateId)
+
+    if (error) {
+      console.error('❌ Error updating custom template:', error)
+      return { success: false, error: 'Failed to update template' }
+    }
+
+    console.log('✅ Custom template updated successfully')
+    return { success: true }
+
+  } catch (error) {
+    console.error('💥 Error in updateCustomTemplate:', error)
+    return { success: false, error: 'Internal server error' }
+  }
+}
+
+// Ta bort anpassad mall
+export async function deleteCustomTemplate(
+  userId: string,
+  templateId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Kontrollera att mallen tillhör användaren
+    const { data: existingTemplate } = await supabase
+      .from('custom_cv_templates')
+      .select('user_id')
+      .eq('id', templateId)
+      .single()
+
+    if (!existingTemplate || existingTemplate.user_id !== userId) {
+      return { success: false, error: 'Template not found or access denied' }
+    }
+
+    const { error } = await supabase
+      .from('custom_cv_templates')
+      .delete()
+      .eq('id', templateId)
+
+    if (error) {
+      console.error('❌ Error deleting custom template:', error)
+      return { success: false, error: 'Failed to delete template' }
+    }
+
+    console.log('✅ Custom template deleted successfully')
+    return { success: true }
+
+  } catch (error) {
+    console.error('💥 Error in deleteCustomTemplate:', error)
+    return { success: false, error: 'Internal server error' }
+  }
 } 
