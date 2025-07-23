@@ -130,17 +130,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setError(null)
           setLoading(false)
           
-          // Then try to fetch real profile from database (but don't block login)
-          try {
-            await fetchProfile(session.user.id, session.user)
-          } catch (profileError) {
-            console.warn("Profile fetch failed, using fallback:", profileError)
-            // Fallback is already set, so just log the error
+          // Only fetch real profile if we don't have one or if it's different user
+          if (!profile || profile.id !== session.user.id) {
+            try {
+              await fetchProfile(session.user.id, session.user)
+            } catch (profileError) {
+              console.warn("Profile fetch failed, using fallback:", profileError)
+              // Fallback is already set, so just log the error
+            }
           }
         } else {
+          // SIGNED OUT - clear everything immediately
+          console.log("User signed out, clearing state")
           setProfile(null)
-          setError(null) // Clear errors when logged out
+          setError(null)
           setLoading(false)
+          
+          // Force clear any cached data
+          clearLocalSession()
         }
       } catch (error) {
         console.error("Error in auth state change:", error)
@@ -385,28 +392,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!supabase) throw new Error("Supabase is not configured")
 
     try {
+      console.log("🚪 Starting signOut process...")
+      
+      // Always clear local state first
+      setUser(null)
+      setProfile(null)
+      setError(null)
+      setLoading(false)
+      
+      // Clear local session data
+      clearLocalSession()
+      
       const result = await signOutSafely()
       if (!result.success) {
         // If session is already missing, that's actually success for logout
         if (result.error?.includes('session missing') || result.error?.includes('Session saknas')) {
           console.log("Session already missing, treating as successful logout")
-          // Clear local state
-          setUser(null)
-          setProfile(null)
-          setError(null)
           return
         }
-        throw new Error(result.error)
+        console.warn("SignOut had errors but local state cleared:", result.error)
+      }
+      
+      console.log("✅ SignOut completed successfully")
+      
+      // Force redirect to login page
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth/login'
       }
     } catch (error) {
       console.error("Error during signOut:", error)
       // For logout, we should clear local state even if there's an error
-      clearLocalSession() // Clear any remaining local session data
+      clearLocalSession()
       setUser(null)
       setProfile(null)
       setError(null)
-      // Don't throw the error for logout - just log it
-      console.warn("Logout completed with errors, but local state cleared")
+      setLoading(false)
+      
+      // Force redirect even on error
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth/login'
+      }
     }
   }
 

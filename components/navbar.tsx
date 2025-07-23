@@ -48,12 +48,15 @@ export function Navbar() {
 
   const handleSignOut = async () => {
     try {
+      console.log("🚪 Navbar: Starting logout process...")
       await signOut()
-      // Successful logout - could redirect or show success message
+      console.log("✅ Navbar: Logout completed")
+      // signOut function will handle redirect
     } catch (error) {
-      console.error("Error signing out:", error)
-      // Even if there's an error, the auth provider should handle cleanup
-      // So we don't need to show an error to the user for logout
+      console.error("❌ Navbar: Error signing out:", error)
+      // Force logout even on error
+      clearLocalSession()
+      window.location.href = '/auth/login'
     }
   }
 

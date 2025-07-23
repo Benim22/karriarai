@@ -182,7 +182,7 @@ function useToast() {
         listeners.splice(index, 1)
       }
     }
-  }, [state])
+  }, []) // Ta bort state från dependency array för att förhindra loops
 
   return {
     ...state,

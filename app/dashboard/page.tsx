@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useState, useCallback, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { Navbar } from "@/components/navbar"
@@ -30,11 +30,14 @@ import {
   Briefcase,
   Target,
   Award,
-  Loader2
+  Loader2,
+  RefreshCw,
+  AlertTriangle
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { sv } from "date-fns/locale"
 import Link from "next/link"
+import { CVTemplatePreview } from "@/components/cv-template-preview"
 
 // Mock data för utveckling
 const mockCVs = [
@@ -105,60 +108,243 @@ function DashboardPageContent() {
   const router = useRouter()
   const [cvs, setCvs] = useState(mockCVs)
   const [exports, setExports] = useState(mockExports)
-  const [dataLoading, setDataLoading] = useState(true)
+  const [dataLoading, setDataLoading] = useState(false) // Start with false to avoid initial loading
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCV, setSelectedCV] = useState<any>(null)
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false)
+  const [previewLoading, setPreviewLoading] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [cvToDelete, setCvToDelete] = useState<any>(null)
+  const fetchingRef = useRef(false)
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated and reset data when logged out
   useEffect(() => {
     if (!loading && !user) {
+      console.log("🚪 User logged out, clearing dashboard data and redirecting...")
+      // Clear all dashboard data when user logs out
+      setCvs([])
+      setExports([])
+      setSelectedCV(null)
+      setDataLoading(false)
+      fetchingRef.current = false
+      setPreviewDialogOpen(false)
+      setDeleteDialogOpen(false)
+      setCvToDelete(null)
+      
       router.push("/auth/login?redirectTo=/dashboard")
     }
   }, [user, loading, router])
 
-  // Fetch user data when authenticated
-  useEffect(() => {
-    if (user && !loading) {
-      fetchUserData()
+  // Memoized fetch function to prevent infinite loops
+  const fetchUserData = useCallback(async () => {
+    if (!user?.id) {
+      console.warn("No user ID available for fetching data")
+      return
     }
-  }, [user, loading])
 
-  const fetchUserData = async () => {
+    // Prevent multiple simultaneous fetches
+    if (fetchingRef.current) {
+      console.log("⏳ Data fetch already in progress, skipping...")
+      return
+    }
+
+    fetchingRef.current = true
+    setDataLoading(true)
+    console.log("🔄 Fetching user data for:", user.id.substring(0, 8) + '...')
+    
     try {
       const { supabase } = await import("@/lib/supabase")
 
-      // Fetch user's CVs
-      const { data: userCVs } = await supabase
+      // Fetch user's CVs with better error handling
+      const { data: userCVs, error: cvError } = await supabase
         .from("cvs")
         .select("*")
-        .eq("user_id", user!.id)
+        .eq("user_id", user.id)
         .order("updated_at", { ascending: false })
 
-      // Fetch recent exports
-      const { data: userExports } = await supabase
+      if (cvError) {
+        console.error("Error fetching CVs:", cvError)
+        setCvs([]) // Set empty array instead of mock data
+      } else {
+        console.log("✅ Successfully fetched", userCVs?.length || 0, "CVs")
+        setCvs(userCVs || [])
+      }
+
+      // Fetch recent exports with better error handling
+      const { data: userExports, error: exportError } = await supabase
         .from("export_history")
         .select("*")
-        .eq("user_id", user!.id)
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(10)
 
-      setCvs(userCVs || mockCVs)
-      setExports(userExports || mockExports)
+      if (exportError) {
+        console.error("Error fetching exports:", exportError)
+        setExports([])
+      } else {
+        console.log("✅ Successfully fetched", userExports?.length || 0, "exports")
+        setExports(userExports || [])
+      }
+
     } catch (error) {
-      console.error("Error fetching user data:", error)
-      setCvs(mockCVs)
-      setExports(mockExports)
+      console.error("❌ Critical error fetching user data:", error)
+      setCvs([])
+      setExports([])
     } finally {
+      fetchingRef.current = false
       setDataLoading(false)
+      console.log("✅ Data loading complete")
     }
+  }, [user?.id]) // Ta bort dataLoading från dependencies för att undvika loops
+
+  // Fetch user data when authenticated - only once per user
+  useEffect(() => {
+    if (user && !loading && user.id) {
+      console.log("🚀 Triggering fetchUserData for user:", user.id.substring(0, 8) + '...')
+      fetchUserData()
+    }
+  }, [user?.id, loading]) // Ta bort fetchUserData från dependency för att förhindra loops
+
+  // Helper funktioner för CV preview
+  const transformCVDataForPreview = (cv: any) => {
+    if (!cv.content) {
+      console.warn("⚠️ No content found in CV:", cv.title)
+      return null
+    }
+    
+    console.log("🔄 Transforming CV data:", cv.content)
+    
+    // Hantera personal info från olika fält
+    const personalInfo = cv.content.personalInfo || cv.content.personal_info || {}
+    
+    // Hantera work experience från olika fält  
+    const experiences = cv.content.experiences || cv.content.work_experience || []
+    
+    // Transform experiences till rätt format
+    const transformedExperiences = experiences.map((exp: any) => ({
+      id: exp.id || Math.random().toString(),
+      title: exp.title || exp.position || "",
+      company: exp.company || "",
+      location: exp.location || "",
+      startDate: exp.startDate || exp.start_date || "",
+      endDate: exp.endDate || exp.end_date || "",
+      current: exp.current || false,
+      description: exp.description || ""
+    }))
+    
+    // Transform education till rätt format
+    const transformedEducation = (cv.content.education || []).map((edu: any) => ({
+      id: edu.id || Math.random().toString(),
+      degree: edu.degree || edu.field || "",
+      school: edu.school || edu.institution || "",
+      location: edu.location || "",
+      startDate: edu.startDate || edu.start_date || "",
+      endDate: edu.endDate || edu.end_date || "",
+      current: edu.current || false,
+      description: edu.description || ""
+    }))
+    
+    // Transform skills till rätt format
+    const transformedSkills = (cv.content.skills || []).map((skill: any) => {
+      let level = 'Medel' // Default
+      if (typeof skill.level === 'number') {
+        // Konvertera numerisk level till text
+        const levels = ['Nybörjare', 'Medel', 'Avancerad', 'Expert']
+        level = levels[Math.min(skill.level - 1, 3)] || 'Medel'
+      } else if (typeof skill.level === 'string') {
+        level = skill.level
+      }
+      
+      return {
+        id: skill.id || Math.random().toString(),
+        name: skill.name || "",
+        level: level as 'Nybörjare' | 'Medel' | 'Avancerad' | 'Expert'
+      }
+    }).filter((skill: any) => skill.name.trim() !== "") // Filtrera bort tomma skills
+    
+    const transformedData = {
+      personalInfo: {
+        fullName: personalInfo.fullName || personalInfo.full_name || "Namn saknas",
+        email: personalInfo.email || "",
+        phone: personalInfo.phone || "",
+        address: personalInfo.address || "",
+        city: personalInfo.city || "",
+        postalCode: personalInfo.postalCode || personalInfo.postal_code || "",
+        summary: personalInfo.summary || ""
+      },
+      experiences: transformedExperiences,
+      education: transformedEducation,
+      skills: transformedSkills,
+      languages: cv.content.languages || [],
+      certifications: cv.content.certifications || []
+    }
+    
+    console.log("✅ Transformed CV data:", transformedData)
+    return transformedData
   }
 
-  const handlePreviewCV = (cv: any) => {
-    setSelectedCV(cv)
-    setPreviewDialogOpen(true)
+  const getDefaultTemplate = () => ({
+    id: 'default',
+    name: 'Standard Mall',
+    category: 'modern',
+    template_data: {}
+  })
+
+  const getDefaultStyles = () => ({
+    fontFamily: 'Inter',
+    fontSize: '14px',
+    primaryColor: '#2563eb',
+    secondaryColor: '#64748b',
+    accentColor: '#3b82f6',
+    backgroundColor: '#ffffff',
+    headerStyle: 'modern',
+    sectionSpacing: 'medium',
+    layout: 'single-column',
+    sectionStyle: 'minimal',
+    headerPosition: 'top'
+  })
+
+  const handlePreviewCV = async (cv: any) => {
+    console.log("👁️ Opening preview for CV:", cv.title)
+    
+    setPreviewLoading(true)
+    setSelectedCV(null) // Reset selected CV
+    setPreviewDialogOpen(true) // Open dialog immediately
+    
+    try {
+      const { supabase } = await import("@/lib/supabase")
+      
+      // Hämta fullständig CV-data med template information
+      const { data: fullCVData, error } = await supabase
+        .from("cvs")
+        .select(`
+          *,
+          cv_templates (
+            id,
+            name,
+            category,
+            template_data
+          )
+        `)
+        .eq("id", cv.id)
+        .single()
+      
+      if (error) {
+        console.error("❌ Error fetching CV data:", error)
+        console.log("🔄 Using fallback basic CV data:", cv)
+        setSelectedCV(cv) // Fallback till basic data
+      } else {
+        console.log("✅ CV data fetched successfully")
+        console.log("📊 Full CV data structure:", JSON.stringify(fullCVData, null, 2))
+        setSelectedCV(fullCVData)
+      }
+      
+    } catch (error) {
+      console.error("❌ Critical error in preview:", error)
+      setSelectedCV(cv) // Fallback
+    } finally {
+      setPreviewLoading(false)
+    }
   }
 
   const handleDeleteCV = (cv: any) => {
@@ -170,6 +356,7 @@ function DashboardPageContent() {
     if (!cvToDelete) return
 
     try {
+      console.log("🗑️ Deleting CV:", cvToDelete.title)
       const { supabase } = await import("@/lib/supabase")
       
       const { error } = await supabase
@@ -178,26 +365,37 @@ function DashboardPageContent() {
         .eq("id", cvToDelete.id)
         .eq("user_id", user!.id)
 
-      if (error) throw error
+      if (error) {
+        console.error("❌ Database error deleting CV:", error)
+        throw error
+      }
 
-      setCvs(cvs.filter(cv => cv.id !== cvToDelete.id))
+      console.log("✅ CV deleted from database successfully")
       
-      const event = new CustomEvent('show-toast', {
+      // Update local state
+      setCvs(prevCvs => prevCvs.filter(cv => cv.id !== cvToDelete.id))
+      setDeleteDialogOpen(false)
+      setCvToDelete(null)
+      
+      // Show success toast
+      const successEvent = new CustomEvent('show-toast', {
         detail: { 
-          message: 'CV raderat framgångsrikt', 
+          message: `CV "${cvToDelete.title}" har tagits bort framgångsrikt`, 
           type: 'success' 
         }
       })
-      window.dispatchEvent(event)
+      window.dispatchEvent(successEvent)
     } catch (error) {
-      console.error("Error deleting CV:", error)
-      const event = new CustomEvent('show-toast', {
+      console.error("❌ Critical error deleting CV:", error)
+      
+      // Show error toast
+      const errorEvent = new CustomEvent('show-toast', {
         detail: { 
-          message: 'Kunde inte radera CV', 
+          message: 'Kunde inte ta bort CV:t. Försök igen.', 
           type: 'error' 
         }
       })
-      window.dispatchEvent(event)
+      window.dispatchEvent(errorEvent)
     } finally {
       setDeleteDialogOpen(false)
       setCvToDelete(null)
@@ -372,94 +570,120 @@ function DashboardPageContent() {
               </CardHeader>
               <CardContent>
                 {dataLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                  <div className="flex items-center justify-center py-12">
+                    <div className="text-center">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+                      <p className="text-gray-600 font-medium">Laddar dina CV...</p>
+                      <p className="text-sm text-gray-500 mt-1">Detta kan ta några sekunder</p>
+                    </div>
                   </div>
                 ) : filteredCVs.length === 0 ? (
                   <div className="text-center py-12">
-                    <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <FileText className="h-8 w-8 text-blue-600" />
+                    <div className="h-20 w-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <FileText className="h-10 w-10 text-blue-600" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      {searchTerm ? "Inga CV hittades" : "Inga CV än"}
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                      {searchTerm ? "Inga CV hittades" : "Välkommen till ditt CV-bibliotek!"}
                     </h3>
-                    <p className="text-gray-600 mb-6">
+                    <p className="text-gray-600 mb-8 max-w-md mx-auto">
                       {searchTerm 
-                        ? "Försök med en annan sökning" 
-                        : "Skapa ditt första CV för att komma igång"
+                        ? "Försök med en annan sökning eller rensa filtret för att se alla dina CV." 
+                        : "Skapa ditt första professionella CV med AI-stöd och moderna mallar."
                       }
                     </p>
-                    {!searchTerm && (
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+                      {!searchTerm && (
+                        <Button 
+                          onClick={() => canCreateCV ? router.push('/cv-builder') : null}
+                          disabled={!canCreateCV}
+                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
+                          size="lg"
+                        >
+                          <Plus className="mr-2 h-5 w-5" />
+                          Skapa ditt första CV
+                        </Button>
+                      )}
                       <Button 
-                        onClick={() => canCreateCV ? router.push('/cv-builder') : null}
-                        disabled={!canCreateCV}
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        onClick={fetchUserData}
+                        variant="outline"
+                        size="lg"
+                        className="border-blue-200 hover:bg-blue-50"
                       >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Skapa ditt första CV
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Uppdatera
                       </Button>
-                    )}
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {filteredCVs.map((cv) => (
-                      <div
+                      <Card
                         key={cv.id}
-                        className="group flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-blue-200 transition-all duration-200"
+                        className="group border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02] bg-white"
                       >
-                        <div className="flex items-center space-x-4">
-                          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
-                            <FileText className="h-6 w-6 text-white" />
-                          </div>
-                          <div>
-                            <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                              {cv.title}
-                            </h3>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Badge 
-                                variant={cv.status === 'completed' ? 'default' : 'secondary'}
-                                className="text-xs"
+                        <CardContent className="p-6">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-4">
+                              <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg">
+                                <FileText className="h-7 w-7 text-white" />
+                              </div>
+                              <div className="flex-1">
+                                <h3 className="font-bold text-lg text-gray-900 group-hover:text-blue-600 transition-colors mb-1">
+                                  {cv.title}
+                                </h3>
+                                <div className="flex items-center gap-3">
+                                  <Badge 
+                                    variant={cv.status === 'completed' ? 'default' : 'secondary'}
+                                    className="text-xs font-medium"
+                                  >
+                                    {cv.status === 'completed' ? '✅ Klar' : '📝 Utkast'}
+                                  </Badge>
+                                  <div className="flex items-center gap-1 text-sm text-gray-500">
+                                    <Calendar className="h-3 w-3" />
+                                    <span>
+                                      Uppdaterad {formatDistanceToNow(new Date(cv.updated_at), {
+                                        addSuffix: true,
+                                        locale: sv,
+                                      })}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                className="hover:bg-blue-100 hover:text-blue-600 rounded-xl"
+                                onClick={() => handlePreviewCV(cv)}
+                                title="Förhandsgranska CV"
                               >
-                                {cv.status === 'completed' ? 'Klar' : 'Utkast'}
-                              </Badge>
-                              <span className="text-sm text-gray-500">
-                                Uppdaterad {formatDistanceToNow(new Date(cv.updated_at), {
-                                  addSuffix: true,
-                                  locale: sv,
-                                })}
-                              </span>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                className="hover:bg-green-100 hover:text-green-600 rounded-xl"
+                                asChild
+                                title="Redigera CV"
+                              >
+                                <Link href={`/cv-builder?id=${cv.id}`}>
+                                  <Edit className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                className="hover:bg-red-100 hover:text-red-600 rounded-xl"
+                                onClick={() => handleDeleteCV(cv)}
+                                title="Ta bort CV"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="hover:bg-blue-100 hover:text-blue-600"
-                            onClick={() => handlePreviewCV(cv)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="hover:bg-green-100 hover:text-green-600"
-                            asChild
-                          >
-                            <Link href={`/cv-builder?id=${cv.id}`}>
-                              <Edit className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="hover:bg-red-100 hover:text-red-600"
-                            onClick={() => handleDeleteCV(cv)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
+                        </CardContent>
+                      </Card>
                     ))}
                   </div>
                 )}
@@ -542,7 +766,17 @@ function DashboardPageContent() {
       </div>
 
       {/* CV Preview Dialog */}
-      <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
+      <Dialog 
+        open={previewDialogOpen} 
+        onOpenChange={(open) => {
+          setPreviewDialogOpen(open)
+          if (!open) {
+            // Reset state när dialogen stängs
+            setSelectedCV(null)
+            setPreviewLoading(false)
+          }
+        }}
+      >
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selectedCV?.title}</DialogTitle>
@@ -551,31 +785,58 @@ function DashboardPageContent() {
             </DialogDescription>
           </DialogHeader>
           <div className="mt-4">
-            {selectedCV && (
-              <div className="bg-white border rounded-lg p-8 shadow-inner">
-                <div className="text-center py-12 text-gray-500">
-                  <FileText className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                  <p className="text-lg font-medium">CV Förhandsgranskning</p>
-                  <p className="text-sm mt-2">
-                    Här visas ditt CV med vald mall och innehåll
-                  </p>
-                  <div className="mt-6 space-y-2 text-left max-w-md mx-auto">
-                    <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                    <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4"></div>
-                    <div className="h-4 bg-gray-200 rounded animate-pulse w-1/2"></div>
+            {previewLoading ? (
+              <div className="text-center py-16 text-gray-500">
+                <Loader2 className="h-10 w-10 animate-spin mx-auto mb-4 text-blue-600" />
+                <p className="text-lg font-medium">Laddar förhandsgranskning...</p>
+                <p className="text-sm mt-1">Hämtar CV-data och mall</p>
+              </div>
+            ) : selectedCV ? (
+              <div className="bg-white border rounded-lg shadow-inner max-h-[600px] overflow-y-auto">
+                {selectedCV.content && transformCVDataForPreview(selectedCV) ? (
+                  <div className="p-4">
+                    <CVTemplatePreview
+                      cvData={transformCVDataForPreview(selectedCV)}
+                      template={selectedCV.cv_templates || getDefaultTemplate()}
+                      styles={selectedCV.styles || getDefaultStyles()}
+                    />
                   </div>
-                </div>
+                ) : (
+                  <div className="text-center py-16 text-gray-500">
+                    <FileText className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                    <p className="text-lg font-medium">Tomt CV</p>
+                    <p className="text-sm mt-2 max-w-md mx-auto">
+                      Detta CV innehåller ingen data än. Klicka på "Redigera" för att lägga till innehåll och skapa ditt professionella CV.
+                    </p>
+                    <Button asChild className="mt-4">
+                      <Link href={`/cv-builder?id=${selectedCV.id}`}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        Börja redigera
+                      </Link>
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-16 text-gray-500">
+                <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-amber-500" />
+                <p className="text-lg font-medium">Kunde inte ladda CV</p>
+                <p className="text-sm mt-2">Ett fel uppstod när CV:t skulle hämtas.</p>
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPreviewDialogOpen(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setPreviewDialogOpen(false)}
+              disabled={previewLoading}
+            >
               Stäng
             </Button>
-            <Button asChild>
+            <Button asChild disabled={previewLoading || !selectedCV}>
               <Link href={`/cv-builder?id=${selectedCV?.id}`}>
                 <Edit className="mr-2 h-4 w-4" />
-                Redigera
+                Redigera CV
               </Link>
             </Button>
           </DialogFooter>
